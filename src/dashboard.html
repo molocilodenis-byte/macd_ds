@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MACD Bot DOGE v7.1 deepseek</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#07090f;color:#dde3f0;font-family:'Inter',sans-serif;font-size:13px;padding:16px;}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;background:#0e1220;padding:12px 20px;border-radius:12px;border:1px solid #1c2640;}
+.logo{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;letter-spacing:2px;}
+.logo em{color:#9d6fff;font-style:normal;}
+.logo sup{font-size:9px;color:#ffb930;margin-left:4px;}
+.hright{display:flex;align-items:center;gap:12px;}
+.dot{width:8px;height:8px;border-radius:50%;background:#4a5580;}
+.dot.on{background:#00d4a0;box-shadow:0 0 6px #00d4a0;}
+.stxt{font-size:11px;color:#4a5580;}
+.dry-pill{background:#0a2a1f;color:#00d4a0;border:1px solid #00d4a030;border-radius:16px;padding:2px 10px;font-size:10px;font-weight:600;}
+.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;}
+.scard{background:#0e1220;border:1px solid #1c2640;border-radius:10px;padding:10px 12px;}
+.slabel{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#4a5580;margin-bottom:4px;}
+.sval{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;}
+.green{color:#00d4a0;}
+.red{color:#ff4d6d;}
+.amber{color:#ffb930;}
+.blue{color:#4d9fff;}
+.ctrl{display:flex;gap:8px;margin-bottom:16px;}
+.btn{padding:6px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;transition:0.2s;}
+.btn-stop{background:#ff4d6d;color:#fff;}
+.btn-reset{background:#6b2e2e;color:#fff;}
+.btn-csv{background:#151d30;color:#dde3f0;border:1px solid #1c2640;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;}
+.btn:hover:not(:disabled){filter:brightness(1.1);}
+.pcard{background:#0e1220;border:1px solid #1c2640;border-radius:12px;margin-bottom:16px;overflow:hidden;}
+.phead{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid #1c2640;background:#0a0e18;}
+.pname{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:#c2a633;}
+.pprice{font-family:'Space Mono',monospace;font-size:13px;}
+.pchg{font-size:11px;margin-left:6px;}
+.pchg.up{color:#00d4a0;}
+.pchg.dn{color:#ff4d6d;}
+.pmetrics{display:grid;grid-template-columns:repeat(5,1fr);background:#0e1220;}
+.pm{padding:6px 8px;border-right:1px solid #1c2640;text-align:center;}
+.pml{font-size:9px;text-transform:uppercase;color:#4a5580;margin-bottom:2px;}
+.pmv{font-family:'Space Mono',monospace;font-size:10px;font-weight:700;}
+.psig-row{display:flex;align-items:center;justify-content:space-between;padding:6px 16px;border-top:1px solid #1c2640;background:#0a0e18;}
+.sig{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:16px;font-size:11px;font-weight:700;}
+.sig.BUY{background:#001f14;color:#00d4a0;border:1px solid #00d4a040;}
+.sig.SELL{background:#1f0009;color:#ff4d6d;border:1px solid #ff4d6d40;}
+.sig.HOLD{background:#151d30;color:#4a5580;border:1px solid #1c2640;}
+.sigdot{width:5px;height:5px;border-radius:50%;display:inline-block;}
+.sig.BUY .sigdot{background:#00d4a0;}
+.sig.SELL .sigdot{background:#ff4d6d;}
+.sig.HOLD .sigdot{background:#4a5580;}
+.buy-reason{font-size:9px;color:#ffb930;}
+.hist-bar{display:flex;align-items:center;gap:6px;width:120px;}
+.hist-track{flex:1;height:3px;background:#1c2640;border-radius:2px;position:relative;}
+.hist-fill{position:absolute;height:100%;border-radius:2px;transition:0.2s;}
+.hist-fill.pos{background:#00d4a0;left:50%;}
+.hist-fill.neg{background:#ff4d6d;right:50%;}
+.rsi-track{height:3px;background:#1c2640;border-radius:2px;position:relative;}
+.rsi-fill{position:absolute;height:100%;border-radius:2px;}
+.chart-row{display:flex;flex-direction:column;gap:8px;padding:12px 16px;}
+.chart-container{background:#0a0e18;border-radius:8px;padding:8px;}
+.chart-sublabel{font-size:9px;text-transform:uppercase;color:#4a5580;margin-bottom:4px;}
+canvas{display:block;width:100%;background:#0a0e18;}
+.section-title{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#ffb930;margin:16px 0 8px;border-left:3px solid #ffb930;padding-left:8px;}
+.table-wrap{max-height:200px;overflow-y:auto;border:1px solid #1c2640;border-radius:8px;}
+table{width:100%;border-collapse:collapse;font-size:11px;}
+th{background:#0e1220;color:#4a5580;padding:6px 4px;text-align:left;position:sticky;top:0;}
+td{padding:5px 4px;border-bottom:1px solid #1c2640;}
+.pnl-pos{color:#00d4a0;}
+.pnl-neg{color:#ff4d6d;}
+.log-list{font-family:'Space Mono',monospace;font-size:9px;color:#607090;display:flex;flex-direction:column;gap:2px;max-height:140px;overflow-y:auto;background:#0a0e18;padding:6px;border-radius:8px;}
+.log-list .lt{color:#4a5580;margin-right:5px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">MACD<em>BOT</em> deepseek ▸ DOGE <span id="tf-label">15M</span> <sup>v7.1</sup></div>
+  <div class="hright">
+    <div class="dot" id="dot"></div>
+    <span class="stxt" id="stxt">Работает</span>
+    <span class="dry-pill">DRY RUN</span>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="scard"><div class="slabel">Баланс DOGE</div><div class="sval green" id="total-bal">$3,000.00</div></div>
+  <div class="scard"><div class="slabel">P&L нетто</div><div class="sval" id="total-pnl">$0.00</div></div>
+  <div class="scard"><div class="slabel">Всего сделок</div><div class="sval blue" id="total-trades">0</div></div>
+  <div class="scard"><div class="slabel">Винрейт</div><div class="sval amber" id="win-rate">—</div></div>
+  <div class="scard"><div class="slabel">Комиссий уплачено</div><div class="sval red" id="total-commission">$0.00</div></div>
+</div>
+
+<div class="ctrl">
+  <button class="btn btn-stop" id="btn-stop" onclick="stopBot()">■ Остановить</button>
+  <button class="btn btn-reset" id="btn-reset" onclick="resetBot()">⟳ Сбросить</button>
+  <button class="btn btn-csv" onclick="reloadConfig()">⟳ Обновить конфиг</button>
+  <button class="btn btn-csv" onclick="downloadCsv()">↓ Сделки CSV</button>
+  <button class="btn btn-csv" onclick="downloadLog('all')">↓ Лог общий</button>
+  <button class="btn btn-csv" onclick="downloadLog('DOGEUSDT')" style="color:var(--doge)">↓ DOGE лог</button>
+</div>
+
+<div class="pcard">
+  <div class="phead">
+    <span class="pname">DOGE/USDT</span>
+    <span><span class="pprice" id="p-DOGEUSDT">—</span><span class="pchg" id="c-DOGEUSDT"></span></span>
+  </div>
+  <div class="pmetrics">
+    <div class="pm"><div class="pml">MACD</div><div class="pmv" id="macd-DOGEUSDT">—</div></div>
+    <div class="pm"><div class="pml">Signal</div><div class="pmv" id="sig-val-DOGEUSDT">—</div></div>
+    <div class="pm"><div class="pml">Histogram</div><div class="pmv" id="hist-val-DOGEUSDT">—</div></div>
+    <div class="pm"><div class="pml">RSI</div><div class="pmv" id="rsi-DOGEUSDT">—</div></div>
+    <div class="pm"><div class="pml">EMA50</div><div class="pmv" id="trend-DOGEUSDT">—</div></div>
+  </div>
+  <div class="psig-row">
+    <span class="sig HOLD" id="sig-DOGEUSDT"><span class="sigdot"></span>HOLD</span>
+    <span class="buy-reason" id="reason-DOGEUSDT"></span>
+    <span id="warmup-DOGEUSDT" style="font-size:9px;color:#ffb930;display:none;">👀 прогрев</span>
+    <div class="hist-bar">
+      <div class="hist-track"><div class="hist-fill pos" id="hf-DOGEUSDT" style="width:0%"></div></div>
+    </div>
+    <span style="font-family:'Space Mono';font-size:10px;" id="pos-DOGEUSDT">—</span>
+  </div>
+  <div style="padding:0 16px 8px;">
+    <div class="rsi-track" style="position:relative;">
+      <div class="rsi-fill" id="rsi-bar-DOGEUSDT" style="width:50%;background:#4a5580"></div>
+      <div id="rsi-min-line" style="position:absolute;top:0;width:1px;height:100%;background:#2a3560;"></div>
+      <div id="rsi-max-line" style="position:absolute;top:0;width:1px;height:100%;background:#2a3560;"></div>
+    </div>
+    <div style="position:relative;height:14px;font-size:8px;color:#4a5580;">
+      <span style="position:absolute;left:0;">0</span>
+      <span id="rsi-min-label" style="position:absolute;transform:translateX(-50%)">50</span>
+      <span id="rsi-max-label" style="position:absolute;transform:translateX(-50%)">72</span>
+      <span style="position:absolute;right:0;">100</span>
+    </div>
+  </div>
+  <div class="chart-row">
+    <div class="chart-container">
+      <div class="chart-sublabel">Цена DOGE/USDT</div>
+      <canvas id="pc-DOGEUSDT" width="1400" height="220" style="width:100%;height:auto;"></canvas>
+    </div>
+    <div class="chart-container">
+      <div class="chart-sublabel">MACD гистограмма</div>
+      <canvas id="hc-DOGEUSDT" width="1400" height="120" style="width:100%;height:auto;"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="section-title">📌 Активные позиции</div>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Символ</th><th>Вход</th><th>Цена вх.</th><th>Текущая цена</th><th>P&L %</th><th>Причина</th>
+      </tr>
+    </thead>
+    <tbody id="open-positions-body"></tbody>
+  </table>
+</div>
+
+<div class="section-title">📜 История сделок</div>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>Вход</th><th>Цена вх.</th><th>Выход</th><th>Цена вых.</th><th>P&L $</th><th>P&L %</th><th>Комиссия</th><th>Причина</th>
+      </tr>
+    </thead>
+    <tbody id="trades-body"></tbody>
+  </table>
+</div>
+
+<div class="section-title">📝 Лог событий (DOGE)</div>
+<div class="log-list" id="log-DOGEUSDT"></div>
+
+<script>
+let charts = {};
+
+function fmtPrice(v) {
+  if (v === undefined || v === null) return '—';
+  return v.toFixed(5);
+}
+
+function fmtMoney(v) {
+  if (v === undefined || v === null) return '—';
+  return '$' + v.toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function initCharts() {
+  charts['p'] = new Chart(document.getElementById('pc-DOGEUSDT'), {
+    type:'line',
+    data:{labels:[], datasets:[{data:[], borderColor:'#c2a633', backgroundColor:'#c2a63318', borderWidth:1.5, pointRadius:0, fill:true, tension:0.3}]},
+    options:{responsive:true, animation:false, plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{grid:{color:'#1c2640'}, ticks:{color:'#4a5580', font:{size:9}, maxTicksLimit:4}}}
+  }});
+  charts['h'] = new Chart(document.getElementById('hc-DOGEUSDT'), {
+    type:'bar',
+    data:{labels:[], datasets:[{data:[], backgroundColor:[], borderRadius:2, barPercentage:0.8}, {data:[], hidden:true}]},
+    options:{
+      responsive:true, animation:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            title:(i)=>i[0].label,
+            label:(item)=>{
+              let real = item.chart.data.datasets[1].data[item.dataIndex];
+              if(real===undefined) return '';
+              return `Hist: ${real>=0?'+':''}${real.toFixed(7)}`;
+            }
+          }
+        }
+      },
+      scales:{x:{display:false}, y:{grid:{color:'#1c2640'}, ticks:{color:'#4a5580', font:{size:9}, maxTicksLimit:3}}}
+    }
+  });
+}
+
+async function fetchState() {
+  try {
+    const r = await fetch('/api/state');
+    const d = await r.json();
+
+    document.getElementById('dot').className = 'dot' + (d.running ? ' on' : '');
+    document.getElementById('stxt').textContent = d.running ? 'Работает' : 'Остановлен';
+    document.getElementById('btn-stop').disabled = !d.running;
+
+    if (d.interval) {
+      document.getElementById('tf-label').textContent = d.interval + 'M';
+    }
+
+    let totBal = 0, totTrades = 0, totWins = 0, totCommission = 0;
+    d.pairs.forEach(p => {
+      totBal += p.virtual_balance;
+      totTrades += p.total_trades;
+      totWins += p.win_trades;
+      totCommission += p.total_commission || 0;
+
+      document.getElementById('p-DOGEUSDT').textContent = fmtPrice(p.price);
+      const cEl = document.getElementById('c-DOGEUSDT');
+      cEl.textContent = (p.price_change >= 0 ? '+' : '') + p.price_change + '%';
+      cEl.className = 'pchg ' + (p.price_change >= 0 ? 'up' : 'dn');
+
+      document.getElementById('macd-DOGEUSDT').textContent = p.macd ? p.macd.toFixed(7) : '—';
+      document.getElementById('sig-val-DOGEUSDT').textContent = p.signal_line ? p.signal_line.toFixed(7) : '—';
+      const hEl = document.getElementById('hist-val-DOGEUSDT');
+      hEl.textContent = p.histogram ? (p.histogram > 0 ? '+' : '') + p.histogram.toFixed(7) : '—';
+      hEl.style.color = p.histogram > 0 ? '#00d4a0' : p.histogram < 0 ? '#ff4d6d' : '#4a5580';
+
+      document.getElementById('rsi-DOGEUSDT').textContent = p.rsi ? p.rsi.toFixed(1) : '—';
+      document.getElementById('rsi-DOGEUSDT').style.color = p.rsi_ok ? '#00d4a0' : p.rsi > 72 ? '#ff4d6d' : '#4a5580';
+      const rsiBar = document.getElementById('rsi-bar-DOGEUSDT');
+      rsiBar.style.width = Math.min(100, Math.max(0, p.rsi || 0)) + '%';
+      rsiBar.style.background = p.rsi_ok ? '#00d4a0' : p.rsi > 72 ? '#ff4d6d' : '#4a5580';
+
+      const tEl = document.getElementById('trend-DOGEUSDT');
+      tEl.textContent = p.ema_trend > 0 ? (p.trend_ok ? '▲ Вверх' : '▼ Вниз') : '—';
+      tEl.style.color = p.trend_ok ? '#00d4a0' : '#ff4d6d';
+
+      const sig = p.signal || 'HOLD';
+      const sEl = document.getElementById('sig-DOGEUSDT');
+      sEl.className = 'sig ' + sig;
+      sEl.innerHTML = `<span class="sigdot"></span>${sig}`;
+
+      const wuEl = document.getElementById('warmup-DOGEUSDT');
+      if (p.warmup > 0) { wuEl.style.display = 'inline'; wuEl.textContent = `👀 прогрев ${p.warmup}`; }
+      else wuEl.style.display = 'none';
+
+      document.getElementById('reason-DOGEUSDT').textContent = (p.buy_reason && p.buy_reason !== '—' && p.in_position) ? p.buy_reason : '';
+
+      const hf = document.getElementById('hf-DOGEUSDT');
+      const price = p.price || 1;
+      const histPct = Math.abs((p.histogram || 0) / price) * 100;
+      const barWidth = Math.min(48, Math.max(p.histogram !== 0 ? 2 : 0, histPct * 5000));
+      if (p.histogram > 0) {
+        hf.className = 'hist-fill pos';
+        hf.style.width = barWidth + '%';
+        hf.style.left = '50%'; hf.style.right = '';
+      } else if (p.histogram < 0) {
+        hf.className = 'hist-fill neg';
+        hf.style.width = barWidth + '%';
+        hf.style.right = '50%'; hf.style.left = '';
+      } else hf.style.width = '0%';
+
+      const posEl = document.getElementById('pos-DOGEUSDT');
+      if (p.in_position) {
+        posEl.textContent = (p.pnl >= 0 ? '+' : '') + p.pnl + '%';
+        posEl.style.color = p.pnl >= 0 ? '#00d4a0' : '#ff4d6d';
+      } else { posEl.textContent = '—'; posEl.style.color = '#4a5580'; }
+
+      if (p.price_history.length) {
+        charts['p'].data.labels = p.price_history.map(x => x.t);
+        charts['p'].data.datasets[0].data = p.price_history.map(x => x.v);
+        charts['p'].update('none');
+      }
+      if (p.hist_history.length) {
+        const vals = p.hist_history.map(x => x.v);
+        const labels = p.hist_history.map(x => x.t);
+        const maxAbs = Math.max(...vals.map(v => Math.abs(v)));
+        charts['h'].data.labels = labels;
+        charts['h'].data.datasets[1].data = vals;
+        if (maxAbs < 1e-10) {
+          charts['h'].data.datasets[0].data = vals.map(() => 0);
+          charts['h'].data.datasets[0].backgroundColor = vals.map(() => '#4a558060');
+          charts['h'].options.scales.y.min = -1;
+          charts['h'].options.scales.y.max = 1;
+        } else {
+          const padding = maxAbs * 0.1;
+          charts['h'].data.datasets[0].data = vals;
+          charts['h'].data.datasets[0].backgroundColor = vals.map(v => v >= 0 ? '#00d4a0aa' : '#ff4d6daa');
+          charts['h'].options.scales.y.min = -maxAbs - padding;
+          charts['h'].options.scales.y.max = maxAbs + padding;
+        }
+        charts['h'].update('none');
+      }
+
+      // Обновляем пороги RSI из конфига
+      const rsiMin = p.rsi_min;
+      const rsiMax = p.rsi_max;
+      const minLine = document.getElementById('rsi-min-line');
+      const maxLine = document.getElementById('rsi-max-line');
+      const minLabel = document.getElementById('rsi-min-label');
+      const maxLabel = document.getElementById('rsi-max-label');
+      if (minLine && maxLine && minLabel && maxLabel) {
+        minLine.style.left = `${rsiMin}%`;
+        maxLine.style.left = `${rsiMax}%`;
+        minLabel.style.left = `${rsiMin}%`;
+        maxLabel.style.left = `${rsiMax}%`;
+        minLabel.textContent = rsiMin;
+        maxLabel.textContent = rsiMax;
+      }
+    });
+
+    const totPnl = totBal - 3000;
+    document.getElementById('total-bal').textContent = fmtMoney(totBal);
+    const pnlEl = document.getElementById('total-pnl');
+    pnlEl.textContent = (totPnl >= 0 ? '+' : '') + '$' + Math.abs(totPnl).toFixed(2);
+    pnlEl.className = 'sval ' + (totPnl >= 0 ? 'green' : 'red');
+    document.getElementById('total-trades').textContent = totTrades;
+    document.getElementById('win-rate').textContent = totTrades > 0 ? Math.round(totWins / totTrades * 100) + '%' : '—';
+    document.getElementById('total-commission').textContent = fmtMoney(totCommission);
+
+    // Активные позиции
+    const openBody = document.getElementById('open-positions-body');
+    openBody.innerHTML = '';
+    d.pairs.forEach(p => {
+      if (p.positions && p.positions.length) {
+        p.positions.forEach(pos => {
+          const row = openBody.insertRow();
+          row.insertCell(0).textContent = p.symbol.replace('USDT', '');
+          row.insertCell(1).textContent = pos.entry_time.substring(0, 16);
+          row.insertCell(2).textContent = fmtPrice(pos.entry_price);
+          row.insertCell(3).textContent = fmtPrice(p.price);
+          const pnlPct = ((p.price - pos.entry_price) / pos.entry_price * 100).toFixed(2);
+          const pnlCell = row.insertCell(4);
+          pnlCell.textContent = (pnlPct >= 0 ? '+' : '') + pnlPct + '%';
+          pnlCell.className = pnlPct >= 0 ? 'pnl-pos' : 'pnl-neg';
+          row.insertCell(5).textContent = pos.buy_reason || '—';
+        });
+      }
+    });
+    if (openBody.children.length === 0) {
+      openBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#4a5580;">Нет открытых позиций</td></tr>';
+    }
+
+    // История сделок
+    const tradesBody = document.getElementById('trades-body');
+    tradesBody.innerHTML = '';
+    if (d.trades && d.trades.length) {
+      d.trades.forEach((t, i) => {
+        const row = tradesBody.insertRow();
+        row.insertCell(0).textContent = i + 1;
+        row.insertCell(1).textContent = t.ed?.substring(0, 16) || '—';
+        row.insertCell(2).textContent = fmtPrice(t.ep);
+        row.insertCell(3).textContent = t.xd?.substring(0, 16) || '—';
+        row.insertCell(4).textContent = fmtPrice(t.xp);
+        const pnlCell = row.insertCell(5);
+        pnlCell.textContent = (t.pnl >= 0 ? '+' : '') + t.pnl.toFixed(4);
+        pnlCell.className = t.pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+        const pnlPCell = row.insertCell(6);
+        pnlPCell.textContent = (t.pnlp >= 0 ? '+' : '') + t.pnlp + '%';
+        pnlPCell.className = t.pnlp >= 0 ? 'pnl-pos' : 'pnl-neg';
+        row.insertCell(7).textContent = (t.comm ? t.comm.toFixed(4) : '—');
+        row.insertCell(8).textContent = t.r || '—';
+      });
+    } else {
+      tradesBody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#4a5580;">Сделок пока нет</td></tr>';
+    }
+
+    // Логи
+    const symLogs = d.logs.filter(l => l.symbol === 'DOGEUSDT').slice(0, 40);
+    document.getElementById('log-DOGEUSDT').innerHTML = symLogs.map(l => {
+      let color = '#607090';
+      if (l.msg.includes('ПОКУПКА')) color = '#00d4a0';
+      else if (l.msg.includes('ПРОДАЖА')) color = '#ff4d6d';
+      else if (l.msg.includes('Трейлинг')) color = '#ffb930';
+      else if (l.msg.includes('Стоп')) color = '#ff4d6d';
+      const msg = l.msg.replace('[DOGEUSDT] ', '');
+      return `<div style="color:${color}"><span class="lt">${l.time}</span>${msg}</div>`;
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function stopBot()   { await fetch('/api/stop', {method:'POST'}); fetchState(); }
+async function resetBot()  { if(confirm('Сбросить все данные?')) await fetch('/api/reset', {method:'POST'}); location.reload(); }
+async function reloadConfig() { 
+  if(confirm('Обновить конфигурацию? Бот продолжит работу.')) {
+    const r = await fetch('/api/reload_config', {method:'POST'});
+    const res = await r.json();
+    if (res.ok) {
+      alert('Конфигурация обновлена! Страница будет перезагружена.');
+      location.reload();
+    } else {
+      alert('Ошибка: ' + res.message);
+    }
+  }
+}
+function downloadCsv()     { window.location.href = '/api/download_csv'; }
+function downloadLog(sym)  { window.location.href = '/api/download_log?sym=' + sym; }
+
+initCharts();
+fetchState();
+setInterval(fetchState, 5000);
+</script>
+</body>
+</html>
