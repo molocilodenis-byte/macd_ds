@@ -6,6 +6,8 @@
   "port": 7003,
   "csv_file": "macd_trades.csv",
   "market_data_file": "market_data1.csv",
+  "log_market_data": true,
+  "market_data_detail": false,
   "log_file": "macd_log.txt",
   "log_files": {"DOGEUSDT": "macd_log_DOGEUSDT.txt"},
   "state_file": "bot_state1.json",

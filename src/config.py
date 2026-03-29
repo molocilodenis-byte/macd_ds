@@ -1,8 +1,7 @@
 import os
 import json
 
-# Глобальные переменные (будут заполнены при вызове init_config)
-CONFIG_FILE = None
+# Глобальные переменные (заполняются в init_config)
 SYMBOLS = None
 INTERVAL = None
 CHECK_INTERVAL = None
@@ -13,7 +12,6 @@ DRY_RUN = None
 PORT = None
 CSV_FILE = None
 MARKET_DATA_FILE = None
-LOG_MARKET_DATA = False   # значение по умолчанию
 LOG_FILE = None
 STATE_FILE = None
 ALL_TRADES_FILE = None
@@ -36,9 +34,12 @@ USE_ATR_FILTER = None
 ATR_PERIOD = None
 ATR_SMA_PERIOD = None
 ATR_MIN_RATIO = None
-VERSION = None
+LOG_MARKET_DATA = False      # запись market_data.csv
+MARKET_DATA_DETAIL = False   # подробный режим market_data.csv
+VERSION = None               # устанавливается из main.py
+CONFIG_FILE = None           # имя загруженного конфига
 
-LOG_DIR = "log"
+LOG_DIR = "log"               # папка для логов и CSV
 
 def init_config(config_file):
     global SYMBOLS, INTERVAL, CHECK_INTERVAL, KLINES_LIMIT, REQUEST_TIMEOUT, RETRY_COUNT
@@ -47,8 +48,8 @@ def init_config(config_file):
     global MACD_FAST, MACD_SLOW, MACD_SIGNAL, EMA_TREND, RSI_PERIOD, BASE_URL
     global MAX_CONCURRENT_TRADES, TRADE_AMOUNT_TYPE, TRADE_AMOUNT_VALUE, INITIAL_BALANCE, POSITIONS_PER_CYCLE
     global USE_ATR_FILTER, ATR_PERIOD, ATR_SMA_PERIOD, ATR_MIN_RATIO
-    global LOG_DIR
-    global CONFIG_FILE
+    global LOG_MARKET_DATA, MARKET_DATA_DETAIL, LOG_DIR, CONFIG_FILE
+
     CONFIG_FILE = config_file
 
     if not os.path.isfile(config_file):
@@ -61,7 +62,7 @@ def init_config(config_file):
     except Exception as e:
         raise ValueError(f"Ошибка чтения {config_file}: {e}")
 
-    # Обязательные поля
+    # Обязательные ключи (без них не запустимся)
     required_keys = [
         "symbols", "interval", "check_interval", "klines_limit", "request_timeout", "retry_count",
         "dry_run", "port", "csv_file", "market_data_file", "log_file",
@@ -74,7 +75,7 @@ def init_config(config_file):
     if missing:
         raise KeyError(f"Отсутствуют обязательные ключи в конфиге: {missing}")
 
-    # Присваиваем глобальным переменным
+    # Присваиваем значения
     SYMBOLS = cfg["symbols"]
     INTERVAL = cfg["interval"]
     CHECK_INTERVAL = cfg["check_interval"]
@@ -85,7 +86,6 @@ def init_config(config_file):
     PORT = cfg["port"]
     CSV_FILE = os.path.join(LOG_DIR, cfg["csv_file"])
     MARKET_DATA_FILE = os.path.join(LOG_DIR, cfg["market_data_file"])
-    LOG_MARKET_DATA = cfg.get("log_market_data", False)
     LOG_FILE = os.path.join(LOG_DIR, cfg["log_file"])
     STATE_FILE = cfg["state_file"]
     ALL_TRADES_FILE = cfg["all_trades_file"]
@@ -109,11 +109,15 @@ def init_config(config_file):
     ATR_SMA_PERIOD = cfg["atr_sma_period"]
     ATR_MIN_RATIO = cfg["atr_min_ratio"]
 
+    # Новые настройки (опциональны, по умолчанию False)
+    LOG_MARKET_DATA = cfg.get("log_market_data", False)
+    MARKET_DATA_DETAIL = cfg.get("market_data_detail", False)
+
     # Создаём папку для логов
     if not os.path.exists(LOG_DIR):
         os.makedirs(LOG_DIR)
         print(f"Создана папка для логов: {LOG_DIR}")
 
-    print(f"Конфигурация загружена: interval={INTERVAL}, port={PORT}, use_atr_filter={USE_ATR_FILTER}")
+    print(f"Конфигурация загружена: interval={INTERVAL}, port={PORT}, use_atr_filter={USE_ATR_FILTER}, log_market_data={LOG_MARKET_DATA}, market_data_detail={MARKET_DATA_DETAIL}")
     if VERSION:
         print(f"MACD Bot v{VERSION}-deepseek")

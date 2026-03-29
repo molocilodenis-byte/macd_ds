@@ -1,0 +1,1 @@
+python backtest.py log/market_data1.csv --config config.json --output trades.csv

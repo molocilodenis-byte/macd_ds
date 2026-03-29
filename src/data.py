@@ -3,7 +3,7 @@ import time
 import csv
 import requests
 from datetime import datetime
-import config   # ← добавлен импорт config
+import config
 from utils import log
 
 def get_klines(symbol, limit=None):
@@ -61,38 +61,59 @@ def log_market_data(symbol, timestamp, price, volume, macd, signal_line, histogr
     if not config.LOG_MARKET_DATA:
         return
 
-    file_exists = os.path.isfile(config.MARKET_DATA_FILE)
-    fields = [
-        "timestamp", "datetime", "symbol", "price", "volume",
-        "macd", "signal_line", "histogram", "prev_histogram", "rsi", "ema_trend",
-        "trend_ok", "rsi_ok", "volume_ok", "signal_type",
-        "buy_occurred", "sell_occurred", "positions_count", "balance"
+    # Базовые поля (всегда)
+    base_fields = [
+        "timestamp", "price", "volume",
+        "macd", "signal_line", "histogram",
+        "rsi", "ema_trend", "positions_count", "balance"
     ]
+    base_row = {
+        "timestamp": timestamp,
+        "price": f"{price:.8f}",
+        "volume": f"{volume:.2f}",
+        "macd": f"{macd:.8f}",
+        "signal_line": f"{signal_line:.8f}",
+        "histogram": f"{histogram:.8f}",
+        "rsi": f"{rsi:.2f}",
+        "ema_trend": f"{ema_trend:.8f}",
+        "positions_count": positions_count,
+        "balance": f"{balance:.2f}",
+    }
+
+    # Дополнительные поля (только если включён подробный режим)
+    extra_fields = []
+    extra_row = {}
+    if config.MARKET_DATA_DETAIL:
+        extra_fields = ["datetime", "symbol", "prev_histogram", "trend_ok", "rsi_ok", "volume_ok"]
+        extra_row = {
+            "datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "symbol": symbol,
+            "prev_histogram": f"{prev_histogram:.8f}",
+            "trend_ok": trend_ok,
+            "rsi_ok": rsi_ok,
+            "volume_ok": volume_ok,
+        }
+
+    # Поля событий (только если есть событие)
+    event_fields = []
+    event_row = {}
+    if signal_type or buy_occurred or sell_occurred:
+        event_fields = ["signal_type", "buy_occurred", "sell_occurred"]
+        event_row = {
+            "signal_type": signal_type or "",
+            "buy_occurred": buy_occurred,
+            "sell_occurred": sell_occurred,
+        }
+
+    all_fields = base_fields + extra_fields + event_fields
+    row = {**base_row, **extra_row, **event_row}
+
+    file_exists = os.path.isfile(config.MARKET_DATA_FILE)
     try:
         with open(config.MARKET_DATA_FILE, "a", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, fieldnames=fields)
+            writer = csv.DictWriter(f, fieldnames=all_fields)
             if not file_exists:
-                w.writeheader()
-            w.writerow({
-                "timestamp": timestamp,
-                "datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "symbol": symbol,
-                "price": f"{price:.8f}",
-                "volume": f"{volume:.2f}",
-                "macd": f"{macd:.8f}",
-                "signal_line": f"{signal_line:.8f}",
-                "histogram": f"{histogram:.8f}",
-                "prev_histogram": f"{prev_histogram:.8f}",
-                "rsi": f"{rsi:.2f}",
-                "ema_trend": f"{ema_trend:.8f}",
-                "trend_ok": trend_ok,
-                "rsi_ok": rsi_ok,
-                "volume_ok": volume_ok,
-                "signal_type": signal_type or "",
-                "buy_occurred": buy_occurred,
-                "sell_occurred": sell_occurred,
-                "positions_count": positions_count,
-                "balance": f"{balance:.2f}",
-            })
+                writer.writeheader()
+            writer.writerow(row)
     except Exception as e:
         log(f"Ошибка записи market_data: {e}", symbol)
