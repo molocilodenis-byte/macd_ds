@@ -5,6 +5,7 @@ import config
 from indicators import calculate_macd, calculate_rsi, calculate_atr, calculate_ema_series, calculate_roc
 from data import get_klines, save_to_csv, log_market_data
 from utils import log, log_signal
+from state import save_state, save_all_trades
 
 trade_counter = 0
 global_trades = deque(maxlen=100)
@@ -42,6 +43,56 @@ def create_initial_state(symbol):
         "atr": 0.0,
         "ema_slope": 0.0,
     }
+
+def open_positions(symbol, s, signal_type, current_price, macd, signal_line, histogram, rsi, roc, trail_dist, log_prefix, early=False):
+    opened = 0
+    buy_occurred = False
+    while opened < config.POSITIONS_PER_CYCLE and len(s["positions"]) < config.MAX_CONCURRENT_TRADES:
+        if config.TRADE_AMOUNT_TYPE == "percent":
+            trade_amount = s["virtual_balance"] * (config.TRADE_AMOUNT_VALUE / 100)
+        else:
+            trade_amount = config.TRADE_AMOUNT_VALUE
+        if trade_amount < 10:
+            log(f"🚫 Сумма сделки {trade_amount:.2f} USDT слишком мала (мин. 10 USDT)", symbol, log_prefix)
+            break
+        if s["virtual_balance"] >= trade_amount:
+            buy_occurred = True
+            commission_entry = round(trade_amount * config.COMMISSION_PCT, 6)
+            s["virtual_balance"] -= commission_entry
+            s["total_commission"] += commission_entry
+
+            pos = {
+                "entry_price": current_price,
+                "entry_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "max_price": current_price,
+                "trailing_stop": round(current_price * (1 - trail_dist), 6),
+                "buy_reason": f"Сигнал {signal_type}",
+                "entry_macd": macd,
+                "entry_signal": signal_line,
+                "entry_histogram": histogram,
+                "entry_rsi": rsi,
+                "trade_amount": trade_amount,
+                "commission_entry": commission_entry,
+                "pnl_pct": 0.0,
+            }
+            s["positions"].append(pos)
+            opened += 1
+
+            save_state()
+            save_all_trades()
+
+            early_tag = " (ранняя)" if early else ""
+            log(
+                f"📋 ПОКУПКА{early_tag} #{opened} @ {current_price:.6f} | Сумма: {trade_amount:.2f} USDT "
+                f"| Комиссия вход: {commission_entry:.4f} USDT "
+                f"| Причина: {signal_type} | Трейлинг: {pos['trailing_stop']:.6f} | RSI: {rsi:.1f} "
+                f"| ROC: {roc:.2f}% | Позиций открыто: {len(s['positions'])}/{config.MAX_CONCURRENT_TRADES}",
+                symbol, log_prefix
+            )
+        else:
+            log(f"🚫 Недостаточно средств для открытия новой позиции. Баланс: {s['virtual_balance']:.2f}", symbol, log_prefix)
+            break
+    return opened, buy_occurred
 
 def analyze_pair(symbol):
     global trade_counter
@@ -83,7 +134,6 @@ def analyze_pair(symbol):
     else:
         vol_ok = True
 
-    # Вычисляем ROC (скорость изменения цены за 3 свечи)
     roc = calculate_roc(closes, period=3)
 
     s["price"] = current_price
@@ -214,10 +264,13 @@ def analyze_pair(symbol):
     for idx in sorted(positions_to_remove, reverse=True):
         s["positions"].pop(idx)
 
+    if sell_occurred:
+        save_state()
+        save_all_trades()
+
     # ── ВХОД ─────────────────────────────────────────────────────────────
     buy_occurred = False
 
-    # --- Вычисление сигналов A, B, C (существующие) ---
     min_hist = current_price * cfg["min_hist_pct"]
     signal_a = (histogram > 0 and prev_histogram <= 0 and histogram >= min_hist)
     signal_b = (macd > signal_line and prev_histogram <= 0 and histogram > 0 and histogram >= min_hist)
@@ -226,10 +279,10 @@ def analyze_pair(symbol):
                 and macd > signal_line
                 and histogram >= min_hist)
 
-    # --- Сигнал D (ранний импульс) ---
     signal_d = False
+    early_vol_ok = False
+    early_trend_ok = False
     if cfg.get("enable_signal_d", True):
-        # Ослабленный фильтр объёма для раннего входа
         early_vol_min_pct = cfg.get("early_vol_min_pct", cfg["vol_min_pct"])
         early_vol_ok = current_volume >= vol_sma * early_vol_min_pct if cfg["vol_filter"] else True
         early_trend_mult = cfg.get("early_trend_mult", 1.001)
@@ -250,7 +303,6 @@ def analyze_pair(symbol):
     elif signal_d:
         signal_type = "D"
 
-    # Фильтр ATR
     atr_ok = True
     if config.USE_ATR_FILTER and len(s["atr_history"]) >= config.ATR_SMA_PERIOD:
         atr_sma = sum(s["atr_history"]) / len(s["atr_history"])
@@ -264,7 +316,6 @@ def analyze_pair(symbol):
         reasons.append("сигнал MACD")
 
     if signal_type in ('A','B','C'):
-        # Для сигналов A/B/C проверяем основные фильтры
         if not trend_ok:
             reasons.append("тренд")
         if not rsi_ok:
@@ -274,119 +325,30 @@ def analyze_pair(symbol):
         if not atr_ok:
             reasons.append("низкая волатильность")
     elif signal_type == 'D':
-        # Для сигнала D фильтры уже проверены внутри, но можем добавить ATR
         if not atr_ok:
             reasons.append("низкая волатильность")
-        else:
-            # Если ATR ok, то причины пусты
-            pass
-    else:
-        # нет сигнала
-        pass
 
-    # Открытие позиций
     if signal_type and atr_ok:
-        # Если сигнал D, то основные фильтры уже выполнены, открываем
-        # Если A/B/C, проверяем основные фильтры ещё раз (на всякий случай)
         if signal_type in ('A','B','C') and (trend_ok and rsi_ok and vol_ok):
-            opened = 0
-            while opened < config.POSITIONS_PER_CYCLE and len(s["positions"]) < config.MAX_CONCURRENT_TRADES:
-                if config.TRADE_AMOUNT_TYPE == "percent":
-                    trade_amount = s["virtual_balance"] * (config.TRADE_AMOUNT_VALUE / 100)
-                else:
-                    trade_amount = config.TRADE_AMOUNT_VALUE
-                if trade_amount < 10:
-                    log(f"🚫 Сумма сделки {trade_amount:.2f} USDT слишком мала (мин. 10 USDT)", symbol, log_prefix)
-                    break
-                if s["virtual_balance"] >= trade_amount:
-                    buy_occurred = True
-                    commission_entry = round(trade_amount * config.COMMISSION_PCT, 6)
-                    s["virtual_balance"] -= commission_entry
-                    s["total_commission"] += commission_entry
-
-                    pos = {
-                        "entry_price": current_price,
-                        "entry_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "max_price": current_price,
-                        "trailing_stop": round(current_price * (1 - trail_dist), 6),
-                        "buy_reason": f"Сигнал {signal_type}",
-                        "entry_macd": macd,
-                        "entry_signal": signal_line,
-                        "entry_histogram": histogram,
-                        "entry_rsi": rsi,
-                        "trade_amount": trade_amount,
-                        "commission_entry": commission_entry,
-                        "pnl_pct": 0.0,
-                    }
-                    s["positions"].append(pos)
-                    opened += 1
-
-                    log(
-                        f"📋 ПОКУПКА #{opened} @ {current_price:.6f} | Сумма: {trade_amount:.2f} USDT "
-                        f"| Комиссия вход: {commission_entry:.4f} USDT "
-                        f"| Причина: {signal_type} | Трейлинг: {pos['trailing_stop']:.6f} | RSI: {rsi:.1f} "
-                        f"| ROC: {roc:.2f}% | Позиций открыто: {len(s['positions'])}/{config.MAX_CONCURRENT_TRADES}",
-                        symbol, log_prefix
-                    )
-                else:
-                    log(f"🚫 Недостаточно средств для открытия новой позиции. Баланс: {s['virtual_balance']:.2f}", symbol, log_prefix)
-                    break
+            opened, buy_occurred = open_positions(
+                symbol, s, signal_type, current_price, macd, signal_line, histogram, rsi, roc,
+                trail_dist, log_prefix, early=False
+            )
             if opened > 0:
                 log_signal(symbol, signal_type, reasons, True, current_price, rsi, histogram,
                            macd, signal_line, vol_ok, vol_sma, current_volume, trend_ok, rsi_ok, log_prefix)
         elif signal_type == 'D':
-            # Сигнал D уже прошёл все свои фильтры, просто открываем позиции
-            opened = 0
-            while opened < config.POSITIONS_PER_CYCLE and len(s["positions"]) < config.MAX_CONCURRENT_TRADES:
-                if config.TRADE_AMOUNT_TYPE == "percent":
-                    trade_amount = s["virtual_balance"] * (config.TRADE_AMOUNT_VALUE / 100)
-                else:
-                    trade_amount = config.TRADE_AMOUNT_VALUE
-                if trade_amount < 10:
-                    log(f"🚫 Сумма сделки {trade_amount:.2f} USDT слишком мала (мин. 10 USDT)", symbol, log_prefix)
-                    break
-                if s["virtual_balance"] >= trade_amount:
-                    buy_occurred = True
-                    commission_entry = round(trade_amount * config.COMMISSION_PCT, 6)
-                    s["virtual_balance"] -= commission_entry
-                    s["total_commission"] += commission_entry
-
-                    pos = {
-                        "entry_price": current_price,
-                        "entry_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "max_price": current_price,
-                        "trailing_stop": round(current_price * (1 - trail_dist), 6),
-                        "buy_reason": f"Сигнал {signal_type}",
-                        "entry_macd": macd,
-                        "entry_signal": signal_line,
-                        "entry_histogram": histogram,
-                        "entry_rsi": rsi,
-                        "trade_amount": trade_amount,
-                        "commission_entry": commission_entry,
-                        "pnl_pct": 0.0,
-                    }
-                    s["positions"].append(pos)
-                    opened += 1
-
-                    log(
-                        f"📋 ПОКУПКА (ранняя) #{opened} @ {current_price:.6f} | Сумма: {trade_amount:.2f} USDT "
-                        f"| Комиссия вход: {commission_entry:.4f} USDT "
-                        f"| Причина: {signal_type} | Трейлинг: {pos['trailing_stop']:.6f} | RSI: {rsi:.1f} "
-                        f"| ROC: {roc:.2f}% | Позиций открыто: {len(s['positions'])}/{config.MAX_CONCURRENT_TRADES}",
-                        symbol, log_prefix
-                    )
-                else:
-                    log(f"🚫 Недостаточно средств для открытия новой позиции. Баланс: {s['virtual_balance']:.2f}", symbol, log_prefix)
-                    break
+            opened, buy_occurred = open_positions(
+                symbol, s, signal_type, current_price, macd, signal_line, histogram, rsi, roc,
+                trail_dist, log_prefix, early=True
+            )
             if opened > 0:
                 log_signal(symbol, signal_type, reasons, True, current_price, rsi, histogram,
                            macd, signal_line, early_vol_ok, vol_sma, current_volume, early_trend_ok, rsi_ok, log_prefix)
         else:
-            # Не прошедшие сигналы
             log_signal(symbol, signal_type, reasons, False, current_price, rsi, histogram,
                        macd, signal_line, vol_ok, vol_sma, current_volume, trend_ok, rsi_ok, log_prefix)
     else:
-        # Если нет сигнала или не прошел ATR
         if signal_type:
             log_signal(symbol, signal_type, reasons, False, current_price, rsi, histogram,
                        macd, signal_line, vol_ok, vol_sma, current_volume, trend_ok, rsi_ok, log_prefix)

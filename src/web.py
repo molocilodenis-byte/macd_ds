@@ -80,6 +80,7 @@ def api_state():
         "logs": list(global_logs)[:80],
         "trades": trades_for_ui,
         "interval": config.INTERVAL,
+        "version": config.VERSION,   # ← добавляем
     })
 
 @app.route('/api/stop', methods=['POST'])
@@ -112,14 +113,12 @@ def download_csv():
 
 @app.route('/api/download_log')
 def download_log():
-    from flask import request as freq
-    sym = freq.args.get('sym', 'all')
-    if sym in config.LOG_FILES:
-        path = config.LOG_FILES[sym]
-        name = f"macd_log_{sym}_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
-    else:
-        path = config.LOG_FILE
-        name = f"macd_log_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
-    if not os.path.isfile(path):
+    # Единый лог-файл, игнорируем параметр sym
+    if not os.path.isfile(config.LOG_FILE):
         return Response("Лог пуст", status=404, mimetype="text/plain")
-    return send_file(path, mimetype="text/plain", as_attachment=True, download_name=name)
+    return send_file(
+        config.LOG_FILE,
+        mimetype="text/plain",
+        as_attachment=True,
+        download_name=f"macd_log_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+    )

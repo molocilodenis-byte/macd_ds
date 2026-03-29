@@ -78,7 +78,7 @@ td{padding:5px 4px;border-bottom:1px solid #1c2640;}
 <body>
 
 <div class="header">
-  <div class="logo">MACD<em>BOT</em> deepseek ▸ DOGE <span id="tf-label">15M</span> <sup>v7.1</sup></div>
+  <div class="logo">MACD<em>BOT</em> deepseek ▸ DOGE <span id="tf-label">15M</span> <sup><span id="version-label">v7.2</span></sup></div>
   <div class="hright">
     <div class="dot" id="dot"></div>
     <span class="stxt" id="stxt">Работает</span>
@@ -230,8 +230,9 @@ async function fetchState() {
     if (d.interval) {
       document.getElementById('tf-label').textContent = d.interval + 'M';
     }
-
-    let totBal = 0, totTrades = 0, totWins = 0, totCommission = 0;
+    document.getElementById('version-label').textContent = 'v' + (d.version || '7.2');
+    
+	let totBal = 0, totTrades = 0, totWins = 0, totCommission = 0;
     d.pairs.forEach(p => {
       totBal += p.virtual_balance;
       totTrades += p.total_trades;

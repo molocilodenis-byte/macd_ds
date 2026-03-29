@@ -1,126 +1,119 @@
 import os
 import json
 
-CONFIG_FILE = "config.json"
+# Глобальные переменные (будут заполнены при вызове init_config)
+CONFIG_FILE = None
+SYMBOLS = None
+INTERVAL = None
+CHECK_INTERVAL = None
+KLINES_LIMIT = None
+REQUEST_TIMEOUT = None
+RETRY_COUNT = None
+DRY_RUN = None
+PORT = None
+CSV_FILE = None
+MARKET_DATA_FILE = None
+LOG_MARKET_DATA = False   # значение по умолчанию
+LOG_FILE = None
+STATE_FILE = None
+ALL_TRADES_FILE = None
+PAIR_CONFIG = None
+COMMISSION_PCT = None
+STOP_LOSS_PCT = None
+WARMUP_BARS = None
+MACD_FAST = None
+MACD_SLOW = None
+MACD_SIGNAL = None
+EMA_TREND = None
+RSI_PERIOD = None
+BASE_URL = None
+MAX_CONCURRENT_TRADES = None
+TRADE_AMOUNT_TYPE = None
+TRADE_AMOUNT_VALUE = None
+INITIAL_BALANCE = None
+POSITIONS_PER_CYCLE = None
+USE_ATR_FILTER = None
+ATR_PERIOD = None
+ATR_SMA_PERIOD = None
+ATR_MIN_RATIO = None
+VERSION = None
 
-# Значения по умолчанию
-SYMBOLS = ["DOGEUSDT"]
-INTERVAL = 15
-CHECK_INTERVAL = 45
-KLINES_LIMIT = 150
-REQUEST_TIMEOUT = 10
-RETRY_COUNT = 2
-DRY_RUN = True
-PORT = 7002
-CSV_FILE = "macd_trades.csv"
-MARKET_DATA_FILE = "market_data.csv"
-LOG_FILE = "macd_log.txt"
-LOG_FILES = {"DOGEUSDT": "macd_log_DOGEUSDT.txt"}
-STATE_FILE = "bot_state.json"
-ALL_TRADES_FILE = "all_trades.json"
-PAIR_CONFIG = {
-    "DOGEUSDT": {
-        "trailing_dist": 0.010,
-        "cooldown_bars": 2,
-        "rsi_min": 50,
-        "rsi_max": 72,
-        "rsi_exit": 40,
-        "min_hist_pct": 0.0004,
-        "momentum_mult": 1.15,
-        "vol_filter": True,
-        "vol_sma": 20,
-        "vol_min_pct": 0.7,
-        "strong_trend_mult": 1.001,
-        "atr_period": 14,
-        # Новые параметры для сигнала D
-        "enable_signal_d": True,
-        "roc_threshold": 0.3,
-        "early_trend_mult": 1.001,
-        "early_vol_min_pct": 0.6,
-        "early_min_hist_pct": 0.0002,
-    },
-}
-COMMISSION_PCT = 0.001
-STOP_LOSS_PCT = 0.03
-WARMUP_BARS = 3
-MACD_FAST = 12
-MACD_SLOW = 26
-MACD_SIGNAL = 9
-EMA_TREND = 50
-RSI_PERIOD = 14
-BASE_URL = "https://api.bybit.com"
-MAX_CONCURRENT_TRADES = 5
-TRADE_AMOUNT_TYPE = "fixed"
-TRADE_AMOUNT_VALUE = 500
-INITIAL_BALANCE = 3000
-POSITIONS_PER_CYCLE = 1
-USE_ATR_FILTER = False
-ATR_PERIOD = 14
-ATR_SMA_PERIOD = 20
-ATR_MIN_RATIO = 0.8
+LOG_DIR = "log"
 
-def load_config():
+def init_config(config_file):
     global SYMBOLS, INTERVAL, CHECK_INTERVAL, KLINES_LIMIT, REQUEST_TIMEOUT, RETRY_COUNT
-    global DRY_RUN, PORT, CSV_FILE, MARKET_DATA_FILE, LOG_FILE, LOG_FILES
+    global DRY_RUN, PORT, CSV_FILE, MARKET_DATA_FILE, LOG_FILE
     global STATE_FILE, ALL_TRADES_FILE, PAIR_CONFIG, COMMISSION_PCT, STOP_LOSS_PCT, WARMUP_BARS
     global MACD_FAST, MACD_SLOW, MACD_SIGNAL, EMA_TREND, RSI_PERIOD, BASE_URL
     global MAX_CONCURRENT_TRADES, TRADE_AMOUNT_TYPE, TRADE_AMOUNT_VALUE, INITIAL_BALANCE, POSITIONS_PER_CYCLE
     global USE_ATR_FILTER, ATR_PERIOD, ATR_SMA_PERIOD, ATR_MIN_RATIO
+    global LOG_DIR
+    global CONFIG_FILE
+    CONFIG_FILE = config_file
 
-    if not os.path.isfile(CONFIG_FILE):
-        print(f"Файл конфигурации {CONFIG_FILE} не найден! Используются значения по умолчанию.")
-        return
+    if not os.path.isfile(config_file):
+        raise FileNotFoundError(f"Конфигурационный файл '{config_file}' не найден. Бот не может стартовать.")
 
-    print(f"Загружаем конфигурацию из {CONFIG_FILE}...")
+    print(f"Загружаем конфигурацию из {config_file}...")
     try:
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            raw_cfg = json.load(f)
-            print("JSON успешно загружен")
-            cfg = {k: v for k, v in raw_cfg.items() if not k.startswith('_')}
-            print(f"Извлечено ключей: {len(cfg)}")
+        with open(config_file, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
     except Exception as e:
-        print(f"Ошибка чтения {CONFIG_FILE}: {e}")
-        return
+        raise ValueError(f"Ошибка чтения {config_file}: {e}")
 
-    SYMBOLS = cfg.get("symbols", ["DOGEUSDT"])
-    INTERVAL = cfg.get("interval", 15)
-    CHECK_INTERVAL = cfg.get("check_interval", 45)
-    KLINES_LIMIT = cfg.get("klines_limit", 150)
-    REQUEST_TIMEOUT = cfg.get("request_timeout", 10)
-    RETRY_COUNT = cfg.get("retry_count", 2)
-    DRY_RUN = cfg.get("dry_run", True)
-    PORT = cfg.get("port", 7002)
-    CSV_FILE = cfg.get("csv_file", "macd_trades.csv")
-    MARKET_DATA_FILE = cfg.get("market_data_file", "market_data.csv")
-    LOG_FILE = cfg.get("log_file", "macd_log.txt")
-    LOG_FILES = cfg.get("log_files", {"DOGEUSDT": "macd_log_DOGEUSDT.txt"})
-    STATE_FILE = cfg.get("state_file", "bot_state.json")
-    ALL_TRADES_FILE = cfg.get("all_trades_file", "all_trades.json")
-    # Загружаем конфигурацию пары, объединяя с дефолтной
-    loaded_pair_config = cfg.get("pair_config", PAIR_CONFIG)
-    for sym, pair_cfg in loaded_pair_config.items():
-        if sym in PAIR_CONFIG:
-            PAIR_CONFIG[sym].update(pair_cfg)
-        else:
-            PAIR_CONFIG[sym] = pair_cfg
+    # Обязательные поля
+    required_keys = [
+        "symbols", "interval", "check_interval", "klines_limit", "request_timeout", "retry_count",
+        "dry_run", "port", "csv_file", "market_data_file", "log_file",
+        "state_file", "all_trades_file", "pair_config", "commission_pct", "stop_loss_pct",
+        "warmup_bars", "macd_fast", "macd_slow", "macd_signal", "ema_trend", "rsi_period",
+        "base_url", "max_concurrent_trades", "trade_amount_type", "trade_amount_value",
+        "initial_balance", "positions_per_cycle", "use_atr_filter", "atr_period", "atr_sma_period", "atr_min_ratio"
+    ]
+    missing = [k for k in required_keys if k not in cfg]
+    if missing:
+        raise KeyError(f"Отсутствуют обязательные ключи в конфиге: {missing}")
 
-    COMMISSION_PCT = cfg.get("commission_pct", 0.001)
-    STOP_LOSS_PCT = cfg.get("stop_loss_pct", 0.03)
-    WARMUP_BARS = cfg.get("warmup_bars", 3)
-    MACD_FAST = cfg.get("macd_fast", 12)
-    MACD_SLOW = cfg.get("macd_slow", 26)
-    MACD_SIGNAL = cfg.get("macd_signal", 9)
-    EMA_TREND = cfg.get("ema_trend", 50)
-    RSI_PERIOD = cfg.get("rsi_period", 14)
-    BASE_URL = cfg.get("base_url", "https://api.bybit.com")
-    MAX_CONCURRENT_TRADES = cfg.get("max_concurrent_trades", 5)
-    TRADE_AMOUNT_TYPE = cfg.get("trade_amount_type", "fixed")
-    TRADE_AMOUNT_VALUE = cfg.get("trade_amount_value", 500)
-    INITIAL_BALANCE = cfg.get("initial_balance", 3000)
-    POSITIONS_PER_CYCLE = cfg.get("positions_per_cycle", 1)
-    USE_ATR_FILTER = cfg.get("use_atr_filter", False)
-    ATR_PERIOD = cfg.get("atr_period", 14)
-    ATR_SMA_PERIOD = cfg.get("atr_sma_period", 20)
-    ATR_MIN_RATIO = cfg.get("atr_min_ratio", 0.8)
+    # Присваиваем глобальным переменным
+    SYMBOLS = cfg["symbols"]
+    INTERVAL = cfg["interval"]
+    CHECK_INTERVAL = cfg["check_interval"]
+    KLINES_LIMIT = cfg["klines_limit"]
+    REQUEST_TIMEOUT = cfg["request_timeout"]
+    RETRY_COUNT = cfg["retry_count"]
+    DRY_RUN = cfg["dry_run"]
+    PORT = cfg["port"]
+    CSV_FILE = os.path.join(LOG_DIR, cfg["csv_file"])
+    MARKET_DATA_FILE = os.path.join(LOG_DIR, cfg["market_data_file"])
+    LOG_MARKET_DATA = cfg.get("log_market_data", False)
+    LOG_FILE = os.path.join(LOG_DIR, cfg["log_file"])
+    STATE_FILE = cfg["state_file"]
+    ALL_TRADES_FILE = cfg["all_trades_file"]
+    PAIR_CONFIG = cfg["pair_config"]
+    COMMISSION_PCT = cfg["commission_pct"]
+    STOP_LOSS_PCT = cfg["stop_loss_pct"]
+    WARMUP_BARS = cfg["warmup_bars"]
+    MACD_FAST = cfg["macd_fast"]
+    MACD_SLOW = cfg["macd_slow"]
+    MACD_SIGNAL = cfg["macd_signal"]
+    EMA_TREND = cfg["ema_trend"]
+    RSI_PERIOD = cfg["rsi_period"]
+    BASE_URL = cfg["base_url"]
+    MAX_CONCURRENT_TRADES = cfg["max_concurrent_trades"]
+    TRADE_AMOUNT_TYPE = cfg["trade_amount_type"]
+    TRADE_AMOUNT_VALUE = cfg["trade_amount_value"]
+    INITIAL_BALANCE = cfg["initial_balance"]
+    POSITIONS_PER_CYCLE = cfg["positions_per_cycle"]
+    USE_ATR_FILTER = cfg["use_atr_filter"]
+    ATR_PERIOD = cfg["atr_period"]
+    ATR_SMA_PERIOD = cfg["atr_sma_period"]
+    ATR_MIN_RATIO = cfg["atr_min_ratio"]
 
-    print(f"Загружены настройки: interval={INTERVAL}, port={PORT}, use_atr_filter={USE_ATR_FILTER}")
+    # Создаём папку для логов
+    if not os.path.exists(LOG_DIR):
+        os.makedirs(LOG_DIR)
+        print(f"Создана папка для логов: {LOG_DIR}")
+
+    print(f"Конфигурация загружена: interval={INTERVAL}, port={PORT}, use_atr_filter={USE_ATR_FILTER}")
+    if VERSION:
+        print(f"MACD Bot v{VERSION}-deepseek")

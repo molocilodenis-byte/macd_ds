@@ -3,17 +3,17 @@ import time
 import csv
 import requests
 from datetime import datetime
-from config import BASE_URL, INTERVAL, KLINES_LIMIT, REQUEST_TIMEOUT, RETRY_COUNT, CSV_FILE, MARKET_DATA_FILE
+import config   # ← добавлен импорт config
 from utils import log
 
 def get_klines(symbol, limit=None):
     if limit is None:
-        limit = KLINES_LIMIT
-    url = f"{BASE_URL}/v5/market/kline"
-    params = {"category": "spot", "symbol": symbol, "interval": str(INTERVAL), "limit": limit}
-    for attempt in range(RETRY_COUNT + 1):
+        limit = config.KLINES_LIMIT
+    url = f"{config.BASE_URL}/v5/market/kline"
+    params = {"category": "spot", "symbol": symbol, "interval": str(config.INTERVAL), "limit": limit}
+    for attempt in range(config.RETRY_COUNT + 1):
         try:
-            r = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+            r = requests.get(url, params=params, timeout=config.REQUEST_TIMEOUT)
             data = r.json()
             if data["retCode"] == 0:
                 return data["result"]["list"]
@@ -21,11 +21,11 @@ def get_klines(symbol, limit=None):
                 log(f"Ошибка API Bybit: {data['retMsg']}", symbol)
                 return []
         except requests.exceptions.Timeout:
-            log(f"Тайм-аут запроса (попытка {attempt+1}/{RETRY_COUNT+1})", symbol)
-            if attempt < RETRY_COUNT:
+            log(f"Тайм-аут запроса (попытка {attempt+1}/{config.RETRY_COUNT+1})", symbol)
+            if attempt < config.RETRY_COUNT:
                 time.sleep(2)
             else:
-                log(f"Не удалось получить свечи после {RETRY_COUNT+1} попыток", symbol)
+                log(f"Не удалось получить свечи после {config.RETRY_COUNT+1} попыток", symbol)
                 return []
         except Exception as e:
             log(f"Ошибка свечей: {e}", symbol)
@@ -33,7 +33,7 @@ def get_klines(symbol, limit=None):
     return []
 
 def save_to_csv(trade):
-    file_exists = os.path.isfile(CSV_FILE)
+    file_exists = os.path.isfile(config.CSV_FILE)
     fields = [
         "date", "time", "symbol", "side",
         "trade_amount_usdt", "balance_before",
@@ -46,7 +46,7 @@ def save_to_csv(trade):
         "ema_slope", "atr",
     ]
     try:
-        with open(CSV_FILE, "a", newline="", encoding="utf-8") as f:
+        with open(config.CSV_FILE, "a", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=fields)
             if not file_exists:
                 w.writeheader()
@@ -57,7 +57,11 @@ def save_to_csv(trade):
 def log_market_data(symbol, timestamp, price, volume, macd, signal_line, histogram, prev_histogram,
                     rsi, ema_trend, trend_ok, rsi_ok, volume_ok, signal_type,
                     buy_occurred, sell_occurred, positions_count, balance):
-    file_exists = os.path.isfile(MARKET_DATA_FILE)
+    # Если запись market_data отключена в конфиге – ничего не делаем
+    if not config.LOG_MARKET_DATA:
+        return
+
+    file_exists = os.path.isfile(config.MARKET_DATA_FILE)
     fields = [
         "timestamp", "datetime", "symbol", "price", "volume",
         "macd", "signal_line", "histogram", "prev_histogram", "rsi", "ema_trend",
@@ -65,7 +69,7 @@ def log_market_data(symbol, timestamp, price, volume, macd, signal_line, histogr
         "buy_occurred", "sell_occurred", "positions_count", "balance"
     ]
     try:
-        with open(MARKET_DATA_FILE, "a", newline="", encoding="utf-8") as f:
+        with open(config.MARKET_DATA_FILE, "a", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=fields)
             if not file_exists:
                 w.writeheader()

@@ -1,6 +1,6 @@
 from collections import deque
 from datetime import datetime
-from config import LOG_FILE, LOG_FILES
+import config
 
 global_logs = deque(maxlen=150)
 
@@ -12,16 +12,10 @@ def log(msg, symbol=None, display_symbol=None):
     print(line)
     global_logs.appendleft({"time": timestamp, "msg": prefix + msg, "symbol": symbol})
     try:
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
+        with open(config.LOG_FILE, "a", encoding="utf-8") as f:
             f.write(line + "\n")
     except Exception:
         pass
-    if symbol and symbol in LOG_FILES:
-        try:
-            with open(LOG_FILES[symbol], "a", encoding="utf-8") as f:
-                f.write(f"[{date} {timestamp}] {msg}\n")
-        except Exception:
-            pass
 
 def log_signal(symbol, signal_type, reasons, passed, price, rsi, hist, macd, signal_line,
                volume_ok, vol_sma, current_volume, trend_ok, rsi_ok, display_symbol=None):

@@ -2,6 +2,7 @@ import os
 import json
 from collections import deque
 from datetime import datetime
+import config
 from config import ALL_TRADES_FILE, STATE_FILE, INITIAL_BALANCE, SYMBOLS, ATR_SMA_PERIOD
 from utils import log
 import trading
@@ -121,7 +122,7 @@ def save_all_trades():
 
 def save_state():
     state = {
-        "version": "v7.1",
+        "version": config.VERSION,
         "timestamp": datetime.now().isoformat(),
         "pairs": {},
     }
