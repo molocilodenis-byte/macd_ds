@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MACD Bot DOGE v7.1 deepseek</title>
+<title>MACD Bot v7.2</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -78,7 +78,7 @@ td{padding:5px 4px;border-bottom:1px solid #1c2640;}
 <body>
 
 <div class="header">
-  <div class="logo">MACD<em>BOT</em> deepseek ▸ DOGE <span id="tf-label">15M</span> <sup><span id="version-label">v7.2</span></sup></div>
+  <div class="logo">MACD<em>BOT</em> deepseek ▸ <span id="symbols-label"></span> <span id="tf-label">—</span> <sup>v7.2</sup></div>
   <div class="hright">
     <div class="dot" id="dot"></div>
     <span class="stxt" id="stxt">Работает</span>
@@ -87,7 +87,7 @@ td{padding:5px 4px;border-bottom:1px solid #1c2640;}
 </div>
 
 <div class="summary">
-  <div class="scard"><div class="slabel">Баланс DOGE</div><div class="sval green" id="total-bal">$3,000.00</div></div>
+  <div class="scard"><div class="slabel">Баланс USDT</div><div class="sval green" id="total-bal">$0.00</div></div>
   <div class="scard"><div class="slabel">P&L нетто</div><div class="sval" id="total-pnl">$0.00</div></div>
   <div class="scard"><div class="slabel">Всего сделок</div><div class="sval blue" id="total-trades">0</div></div>
   <div class="scard"><div class="slabel">Винрейт</div><div class="sval amber" id="win-rate">—</div></div>
@@ -99,242 +99,267 @@ td{padding:5px 4px;border-bottom:1px solid #1c2640;}
   <button class="btn btn-reset" id="btn-reset" onclick="resetBot()">⟳ Сбросить</button>
   <button class="btn btn-csv" onclick="reloadConfig()">⟳ Обновить конфиг</button>
   <button class="btn btn-csv" onclick="downloadCsv()">↓ Сделки CSV</button>
-  <button class="btn btn-csv" onclick="downloadLog('all')">↓ Лог общий</button>
-  <button class="btn btn-csv" onclick="downloadLog('DOGEUSDT')" style="color:var(--doge)">↓ DOGE лог</button>
+  <button class="btn btn-csv" onclick="downloadLog()">↓ Лог общий</button>
 </div>
 
-<div class="pcard">
-  <div class="phead">
-    <span class="pname">DOGE/USDT</span>
-    <span><span class="pprice" id="p-DOGEUSDT">—</span><span class="pchg" id="c-DOGEUSDT"></span></span>
-  </div>
-  <div class="pmetrics">
-    <div class="pm"><div class="pml">MACD</div><div class="pmv" id="macd-DOGEUSDT">—</div></div>
-    <div class="pm"><div class="pml">Signal</div><div class="pmv" id="sig-val-DOGEUSDT">—</div></div>
-    <div class="pm"><div class="pml">Histogram</div><div class="pmv" id="hist-val-DOGEUSDT">—</div></div>
-    <div class="pm"><div class="pml">RSI</div><div class="pmv" id="rsi-DOGEUSDT">—</div></div>
-    <div class="pm"><div class="pml">EMA50</div><div class="pmv" id="trend-DOGEUSDT">—</div></div>
-  </div>
-  <div class="psig-row">
-    <span class="sig HOLD" id="sig-DOGEUSDT"><span class="sigdot"></span>HOLD</span>
-    <span class="buy-reason" id="reason-DOGEUSDT"></span>
-    <span id="warmup-DOGEUSDT" style="font-size:9px;color:#ffb930;display:none;">👀 прогрев</span>
-    <div class="hist-bar">
-      <div class="hist-track"><div class="hist-fill pos" id="hf-DOGEUSDT" style="width:0%"></div></div>
-    </div>
-    <span style="font-family:'Space Mono';font-size:10px;" id="pos-DOGEUSDT">—</span>
-  </div>
-  <div style="padding:0 16px 8px;">
-    <div class="rsi-track" style="position:relative;">
-      <div class="rsi-fill" id="rsi-bar-DOGEUSDT" style="width:50%;background:#4a5580"></div>
-      <div id="rsi-min-line" style="position:absolute;top:0;width:1px;height:100%;background:#2a3560;"></div>
-      <div id="rsi-max-line" style="position:absolute;top:0;width:1px;height:100%;background:#2a3560;"></div>
-    </div>
-    <div style="position:relative;height:14px;font-size:8px;color:#4a5580;">
-      <span style="position:absolute;left:0;">0</span>
-      <span id="rsi-min-label" style="position:absolute;transform:translateX(-50%)">50</span>
-      <span id="rsi-max-label" style="position:absolute;transform:translateX(-50%)">72</span>
-      <span style="position:absolute;right:0;">100</span>
-    </div>
-  </div>
-  <div class="chart-row">
-    <div class="chart-container">
-      <div class="chart-sublabel">Цена DOGE/USDT</div>
-      <canvas id="pc-DOGEUSDT" width="1400" height="220" style="width:100%;height:auto;"></canvas>
-    </div>
-    <div class="chart-container">
-      <div class="chart-sublabel">MACD гистограмма</div>
-      <canvas id="hc-DOGEUSDT" width="1400" height="120" style="width:100%;height:auto;"></canvas>
-    </div>
-  </div>
-</div>
+<div id="pairs-container"></div>
 
 <div class="section-title">📌 Активные позиции</div>
 <div class="table-wrap">
-  <table>
+   <table>
     <thead>
-      <tr>
-        <th>Символ</th><th>Вход</th><th>Цена вх.</th><th>Текущая цена</th><th>P&L %</th><th>Причина</th>
-      </tr>
+       <tr><th>Символ</th><th>Вход</th><th>Цена вх.</th><th>Текущая цена</th><th>P&L %</th><th>Причина</th></tr>
     </thead>
     <tbody id="open-positions-body"></tbody>
-  </table>
+   </table>
 </div>
 
 <div class="section-title">📜 История сделок</div>
 <div class="table-wrap">
-  <table>
+   <table>
     <thead>
-      <tr>
-        <th>#</th><th>Вход</th><th>Цена вх.</th><th>Выход</th><th>Цена вых.</th><th>P&L $</th><th>P&L %</th><th>Комиссия</th><th>Причина</th>
-      </tr>
+       <tr><th>#</th><th>Вход</th><th>Цена вх.</th><th>Выход</th><th>Цена вых.</th><th>P&L $</th><th>P&L %</th><th>Комиссия</th><th>Причина</th></tr>
     </thead>
     <tbody id="trades-body"></tbody>
-  </table>
+   </table>
 </div>
 
-<div class="section-title">📝 Лог событий (DOGE)</div>
-<div class="log-list" id="log-DOGEUSDT"></div>
+<div class="section-title">📝 Лог событий</div>
+<div class="log-list" id="log-global"></div>
 
 <script>
-let charts = {};
+let charts = {}; // { symbol: { priceChart, histChart } }
+let state = { running: false, pairs: [], logs: [], trades: [], interval: 0, symbols: [] };
 
 function fmtPrice(v) {
   if (v === undefined || v === null) return '—';
   return v.toFixed(5);
 }
-
 function fmtMoney(v) {
   if (v === undefined || v === null) return '—';
   return '$' + v.toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
-function initCharts() {
-  charts['p'] = new Chart(document.getElementById('pc-DOGEUSDT'), {
-    type:'line',
-    data:{labels:[], datasets:[{data:[], borderColor:'#c2a633', backgroundColor:'#c2a63318', borderWidth:1.5, pointRadius:0, fill:true, tension:0.3}]},
-    options:{responsive:true, animation:false, plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{grid:{color:'#1c2640'}, ticks:{color:'#4a5580', font:{size:9}, maxTicksLimit:4}}}
-  }});
-  charts['h'] = new Chart(document.getElementById('hc-DOGEUSDT'), {
-    type:'bar',
-    data:{labels:[], datasets:[{data:[], backgroundColor:[], borderRadius:2, barPercentage:0.8}, {data:[], hidden:true}]},
-    options:{
-      responsive:true, animation:false,
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          callbacks:{
-            title:(i)=>i[0].label,
-            label:(item)=>{
-              let real = item.chart.data.datasets[1].data[item.dataIndex];
-              if(real===undefined) return '';
-              return `Hist: ${real>=0?'+':''}${real.toFixed(7)}`;
-            }
-          }
-        }
-      },
-      scales:{x:{display:false}, y:{grid:{color:'#1c2640'}, ticks:{color:'#4a5580', font:{size:9}, maxTicksLimit:3}}}
+// Создаёт HTML-блок для одной пары
+function createPairCard(symbol) {
+  const container = document.getElementById('pairs-container');
+  const cardId = `card-${symbol}`;
+  const priceCanvasId = `pc-${symbol}`;
+  const histCanvasId = `hc-${symbol}`;
+  
+  const card = document.createElement('div');
+  card.className = 'pcard';
+  card.id = cardId;
+  card.innerHTML = `
+    <div class="phead">
+      <span class="pname">${symbol.replace('USDT', '')}/USDT</span>
+      <span><span class="pprice" id="p-${symbol}">—</span><span class="pchg" id="c-${symbol}"></span></span>
+    </div>
+    <div class="pmetrics">
+      <div class="pm"><div class="pml">MACD</div><div class="pmv" id="macd-${symbol}">—</div></div>
+      <div class="pm"><div class="pml">Signal</div><div class="pmv" id="sig-val-${symbol}">—</div></div>
+      <div class="pm"><div class="pml">Histogram</div><div class="pmv" id="hist-val-${symbol}">—</div></div>
+      <div class="pm"><div class="pml">RSI</div><div class="pmv" id="rsi-${symbol}">—</div></div>
+      <div class="pm"><div class="pml">EMA50</div><div class="pmv" id="trend-${symbol}">—</div></div>
+    </div>
+    <div class="psig-row">
+      <span class="sig HOLD" id="sig-${symbol}"><span class="sigdot"></span>HOLD</span>
+      <span class="buy-reason" id="reason-${symbol}"></span>
+      <span id="warmup-${symbol}" style="font-size:9px;color:#ffb930;display:none;">👀 прогрев</span>
+      <div class="hist-bar">
+        <div class="hist-track"><div class="hist-fill pos" id="hf-${symbol}" style="width:0%"></div></div>
+      </div>
+      <span style="font-family:'Space Mono';font-size:10px;" id="pos-${symbol}">—</span>
+    </div>
+    <div style="padding:0 16px 8px;">
+      <div class="rsi-track" style="position:relative;">
+        <div class="rsi-fill" id="rsi-bar-${symbol}" style="width:50%;background:#4a5580"></div>
+        <div id="rsi-min-line-${symbol}" style="position:absolute;top:0;width:1px;height:100%;background:#2a3560;"></div>
+        <div id="rsi-max-line-${symbol}" style="position:absolute;top:0;width:1px;height:100%;background:#2a3560;"></div>
+      </div>
+      <div style="position:relative;height:14px;font-size:8px;color:#4a5580;">
+        <span style="position:absolute;left:0;">0</span>
+        <span id="rsi-min-label-${symbol}" style="position:absolute;transform:translateX(-50%)">50</span>
+        <span id="rsi-max-label-${symbol}" style="position:absolute;transform:translateX(-50%)">72</span>
+        <span style="position:absolute;right:0;">100</span>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-container">
+        <div class="chart-sublabel">Цена ${symbol.replace('USDT', '')}/USDT</div>
+        <canvas id="${priceCanvasId}" width="1400" height="220" style="width:100%;height:auto;"></canvas>
+      </div>
+      <div class="chart-container">
+        <div class="chart-sublabel">MACD гистограмма</div>
+        <canvas id="${histCanvasId}" width="1400" height="120" style="width:100%;height:auto;"></canvas>
+      </div>
+    </div>
+  `;
+  container.appendChild(card);
+  
+  // Инициализируем графики для этого символа
+  const priceCtx = document.getElementById(priceCanvasId).getContext('2d');
+  const histCtx = document.getElementById(histCanvasId).getContext('2d');
+  
+  charts[symbol] = {
+    priceChart: new Chart(priceCtx, {
+      type: 'line',
+      data: { labels: [], datasets: [{ data: [], borderColor: '#c2a633', backgroundColor: '#c2a63318', borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.3 }] },
+      options: { responsive: true, animation: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: '#1c2640' }, ticks: { color: '#4a5580', font: { size: 9 }, maxTicksLimit: 4 } } } }
+    }),
+    histChart: new Chart(histCtx, {
+      type: 'bar',
+      data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderRadius: 2, barPercentage: 0.8 }, { data: [], hidden: true }] },
+      options: {
+        responsive: true, animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { title: (i) => i[0].label, label: (item) => { let real = item.chart.data.datasets[1].data[item.dataIndex]; return `Hist: ${real >= 0 ? '+' : ''}${real.toFixed(7)}`; } } }
+        },
+        scales: { x: { display: false }, y: { grid: { color: '#1c2640' }, ticks: { color: '#4a5580', font: { size: 9 }, maxTicksLimit: 3 } } }
+      }
+    })
+  };
+}
+
+// Обновление данных для конкретной пары
+function updatePairCard(p) {
+  const sym = p.symbol;
+  const card = document.getElementById(`card-${sym}`);
+  if (!card) return; // карточка ещё не создана – выходим
+
+  const priceEl = document.getElementById(`p-${sym}`);
+  if (priceEl) priceEl.textContent = fmtPrice(p.price);
+  const cEl = document.getElementById(`c-${sym}`);
+  if (cEl) {
+    cEl.textContent = (p.price_change >= 0 ? '+' : '') + p.price_change + '%';
+    cEl.className = 'pchg ' + (p.price_change >= 0 ? 'up' : 'dn');
+  }
+  const macdEl = document.getElementById(`macd-${sym}`);
+  if (macdEl) macdEl.textContent = p.macd ? p.macd.toFixed(7) : '—';
+  const sigEl = document.getElementById(`sig-val-${sym}`);
+  if (sigEl) sigEl.textContent = p.signal_line ? p.signal_line.toFixed(7) : '—';
+  const hEl = document.getElementById(`hist-val-${sym}`);
+  if (hEl) {
+    hEl.textContent = p.histogram ? (p.histogram > 0 ? '+' : '') + p.histogram.toFixed(7) : '—';
+    hEl.style.color = p.histogram > 0 ? '#00d4a0' : p.histogram < 0 ? '#ff4d6d' : '#4a5580';
+  }
+  const rsiEl = document.getElementById(`rsi-${sym}`);
+  if (rsiEl) {
+    rsiEl.textContent = p.rsi ? p.rsi.toFixed(1) : '—';
+    rsiEl.style.color = p.rsi_ok ? '#00d4a0' : p.rsi > 72 ? '#ff4d6d' : '#4a5580';
+  }
+  const rsiBar = document.getElementById(`rsi-bar-${sym}`);
+  if (rsiBar) {
+    rsiBar.style.width = Math.min(100, Math.max(0, p.rsi || 0)) + '%';
+    rsiBar.style.background = p.rsi_ok ? '#00d4a0' : p.rsi > 72 ? '#ff4d6d' : '#4a5580';
+  }
+  const tEl = document.getElementById(`trend-${sym}`);
+  if (tEl) {
+    tEl.textContent = p.ema_trend > 0 ? (p.trend_ok ? '▲ Вверх' : '▼ Вниз') : '—';
+    tEl.style.color = p.trend_ok ? '#00d4a0' : '#ff4d6d';
+  }
+  const sigSpan = document.getElementById(`sig-${sym}`);
+  if (sigSpan) {
+    const sig = p.signal || 'HOLD';
+    sigSpan.className = 'sig ' + sig;
+    sigSpan.innerHTML = `<span class="sigdot"></span>${sig}`;
+  }
+  const wuEl = document.getElementById(`warmup-${sym}`);
+  if (wuEl) {
+    if (p.warmup > 0) { wuEl.style.display = 'inline'; wuEl.textContent = `👀 прогрев ${p.warmup}`; }
+    else wuEl.style.display = 'none';
+  }
+  const reasonEl = document.getElementById(`reason-${sym}`);
+  if (reasonEl) reasonEl.textContent = (p.buy_reason && p.buy_reason !== '—' && p.in_position) ? p.buy_reason : '';
+  
+  const hf = document.getElementById(`hf-${sym}`);
+  if (hf && p.price) {
+    const histPct = Math.abs((p.histogram || 0) / p.price) * 100;
+    const barWidth = Math.min(48, Math.max(p.histogram !== 0 ? 2 : 0, histPct * 5000));
+    if (p.histogram > 0) {
+      hf.className = 'hist-fill pos';
+      hf.style.width = barWidth + '%';
+      hf.style.left = '50%'; hf.style.right = '';
+    } else if (p.histogram < 0) {
+      hf.className = 'hist-fill neg';
+      hf.style.width = barWidth + '%';
+      hf.style.right = '50%'; hf.style.left = '';
+    } else hf.style.width = '0%';
+  }
+  const posEl = document.getElementById(`pos-${sym}`);
+  if (posEl) {
+    if (p.in_position) {
+      posEl.textContent = (p.pnl >= 0 ? '+' : '') + p.pnl + '%';
+      posEl.style.color = p.pnl >= 0 ? '#00d4a0' : '#ff4d6d';
+    } else { posEl.textContent = '—'; posEl.style.color = '#4a5580'; }
+  }
+  
+  // Обновление графиков
+  if (charts[sym] && p.price_history && p.price_history.length) {
+    charts[sym].priceChart.data.labels = p.price_history.map(x => x.t);
+    charts[sym].priceChart.data.datasets[0].data = p.price_history.map(x => x.v);
+    charts[sym].priceChart.update('none');
+  }
+  if (charts[sym] && p.hist_history && p.hist_history.length) {
+    const vals = p.hist_history.map(x => x.v);
+    const labels = p.hist_history.map(x => x.t);
+    const maxAbs = Math.max(...vals.map(v => Math.abs(v)));
+    charts[sym].histChart.data.labels = labels;
+    charts[sym].histChart.data.datasets[1].data = vals;
+    if (maxAbs < 1e-10) {
+      charts[sym].histChart.data.datasets[0].data = vals.map(() => 0);
+      charts[sym].histChart.data.datasets[0].backgroundColor = vals.map(() => '#4a558060');
+      charts[sym].histChart.options.scales.y.min = -1;
+      charts[sym].histChart.options.scales.y.max = 1;
+    } else {
+      const padding = maxAbs * 0.1;
+      charts[sym].histChart.data.datasets[0].data = vals;
+      charts[sym].histChart.data.datasets[0].backgroundColor = vals.map(v => v >= 0 ? '#00d4a0aa' : '#ff4d6daa');
+      charts[sym].histChart.options.scales.y.min = -maxAbs - padding;
+      charts[sym].histChart.options.scales.y.max = maxAbs + padding;
     }
-  });
+    charts[sym].histChart.update('none');
+  }
+  
+  // Обновление RSI порогов
+  const rsiMin = p.rsi_min;
+  const rsiMax = p.rsi_max;
+  const minLine = document.getElementById(`rsi-min-line-${sym}`);
+  const maxLine = document.getElementById(`rsi-max-line-${sym}`);
+  const minLabel = document.getElementById(`rsi-min-label-${sym}`);
+  const maxLabel = document.getElementById(`rsi-max-label-${sym}`);
+  if (minLine && maxLine && minLabel && maxLabel) {
+    minLine.style.left = `${rsiMin}%`;
+    maxLine.style.left = `${rsiMax}%`;
+    minLabel.style.left = `${rsiMin}%`;
+    maxLabel.style.left = `${rsiMax}%`;
+    minLabel.textContent = rsiMin;
+    maxLabel.textContent = rsiMax;
+  }
 }
 
 async function fetchState() {
   try {
     const r = await fetch('/api/state');
     const d = await r.json();
-
+    state = d;
+    
     document.getElementById('dot').className = 'dot' + (d.running ? ' on' : '');
     document.getElementById('stxt').textContent = d.running ? 'Работает' : 'Остановлен';
     document.getElementById('btn-stop').disabled = !d.running;
-
-    if (d.interval) {
-      document.getElementById('tf-label').textContent = d.interval + 'M';
-    }
-    document.getElementById('version-label').textContent = 'v' + (d.version || '7.2');
+    if (d.interval) document.getElementById('tf-label').textContent = d.interval + 'M';
     
-	let totBal = 0, totTrades = 0, totWins = 0, totCommission = 0;
+    // Суммарная статистика
+    let totBal = 0, totTrades = 0, totWins = 0, totCommission = 0;
     d.pairs.forEach(p => {
       totBal += p.virtual_balance;
       totTrades += p.total_trades;
       totWins += p.win_trades;
       totCommission += p.total_commission || 0;
-
-      document.getElementById('p-DOGEUSDT').textContent = fmtPrice(p.price);
-      const cEl = document.getElementById('c-DOGEUSDT');
-      cEl.textContent = (p.price_change >= 0 ? '+' : '') + p.price_change + '%';
-      cEl.className = 'pchg ' + (p.price_change >= 0 ? 'up' : 'dn');
-
-      document.getElementById('macd-DOGEUSDT').textContent = p.macd ? p.macd.toFixed(7) : '—';
-      document.getElementById('sig-val-DOGEUSDT').textContent = p.signal_line ? p.signal_line.toFixed(7) : '—';
-      const hEl = document.getElementById('hist-val-DOGEUSDT');
-      hEl.textContent = p.histogram ? (p.histogram > 0 ? '+' : '') + p.histogram.toFixed(7) : '—';
-      hEl.style.color = p.histogram > 0 ? '#00d4a0' : p.histogram < 0 ? '#ff4d6d' : '#4a5580';
-
-      document.getElementById('rsi-DOGEUSDT').textContent = p.rsi ? p.rsi.toFixed(1) : '—';
-      document.getElementById('rsi-DOGEUSDT').style.color = p.rsi_ok ? '#00d4a0' : p.rsi > 72 ? '#ff4d6d' : '#4a5580';
-      const rsiBar = document.getElementById('rsi-bar-DOGEUSDT');
-      rsiBar.style.width = Math.min(100, Math.max(0, p.rsi || 0)) + '%';
-      rsiBar.style.background = p.rsi_ok ? '#00d4a0' : p.rsi > 72 ? '#ff4d6d' : '#4a5580';
-
-      const tEl = document.getElementById('trend-DOGEUSDT');
-      tEl.textContent = p.ema_trend > 0 ? (p.trend_ok ? '▲ Вверх' : '▼ Вниз') : '—';
-      tEl.style.color = p.trend_ok ? '#00d4a0' : '#ff4d6d';
-
-      const sig = p.signal || 'HOLD';
-      const sEl = document.getElementById('sig-DOGEUSDT');
-      sEl.className = 'sig ' + sig;
-      sEl.innerHTML = `<span class="sigdot"></span>${sig}`;
-
-      const wuEl = document.getElementById('warmup-DOGEUSDT');
-      if (p.warmup > 0) { wuEl.style.display = 'inline'; wuEl.textContent = `👀 прогрев ${p.warmup}`; }
-      else wuEl.style.display = 'none';
-
-      document.getElementById('reason-DOGEUSDT').textContent = (p.buy_reason && p.buy_reason !== '—' && p.in_position) ? p.buy_reason : '';
-
-      const hf = document.getElementById('hf-DOGEUSDT');
-      const price = p.price || 1;
-      const histPct = Math.abs((p.histogram || 0) / price) * 100;
-      const barWidth = Math.min(48, Math.max(p.histogram !== 0 ? 2 : 0, histPct * 5000));
-      if (p.histogram > 0) {
-        hf.className = 'hist-fill pos';
-        hf.style.width = barWidth + '%';
-        hf.style.left = '50%'; hf.style.right = '';
-      } else if (p.histogram < 0) {
-        hf.className = 'hist-fill neg';
-        hf.style.width = barWidth + '%';
-        hf.style.right = '50%'; hf.style.left = '';
-      } else hf.style.width = '0%';
-
-      const posEl = document.getElementById('pos-DOGEUSDT');
-      if (p.in_position) {
-        posEl.textContent = (p.pnl >= 0 ? '+' : '') + p.pnl + '%';
-        posEl.style.color = p.pnl >= 0 ? '#00d4a0' : '#ff4d6d';
-      } else { posEl.textContent = '—'; posEl.style.color = '#4a5580'; }
-
-      if (p.price_history.length) {
-        charts['p'].data.labels = p.price_history.map(x => x.t);
-        charts['p'].data.datasets[0].data = p.price_history.map(x => x.v);
-        charts['p'].update('none');
-      }
-      if (p.hist_history.length) {
-        const vals = p.hist_history.map(x => x.v);
-        const labels = p.hist_history.map(x => x.t);
-        const maxAbs = Math.max(...vals.map(v => Math.abs(v)));
-        charts['h'].data.labels = labels;
-        charts['h'].data.datasets[1].data = vals;
-        if (maxAbs < 1e-10) {
-          charts['h'].data.datasets[0].data = vals.map(() => 0);
-          charts['h'].data.datasets[0].backgroundColor = vals.map(() => '#4a558060');
-          charts['h'].options.scales.y.min = -1;
-          charts['h'].options.scales.y.max = 1;
-        } else {
-          const padding = maxAbs * 0.1;
-          charts['h'].data.datasets[0].data = vals;
-          charts['h'].data.datasets[0].backgroundColor = vals.map(v => v >= 0 ? '#00d4a0aa' : '#ff4d6daa');
-          charts['h'].options.scales.y.min = -maxAbs - padding;
-          charts['h'].options.scales.y.max = maxAbs + padding;
-        }
-        charts['h'].update('none');
-      }
-
-      // Обновляем пороги RSI из конфига
-      const rsiMin = p.rsi_min;
-      const rsiMax = p.rsi_max;
-      const minLine = document.getElementById('rsi-min-line');
-      const maxLine = document.getElementById('rsi-max-line');
-      const minLabel = document.getElementById('rsi-min-label');
-      const maxLabel = document.getElementById('rsi-max-label');
-      if (minLine && maxLine && minLabel && maxLabel) {
-        minLine.style.left = `${rsiMin}%`;
-        maxLine.style.left = `${rsiMax}%`;
-        minLabel.style.left = `${rsiMin}%`;
-        maxLabel.style.left = `${rsiMax}%`;
-        minLabel.textContent = rsiMin;
-        maxLabel.textContent = rsiMax;
-      }
     });
-
-    const totPnl = totBal - 3000;
+    const initialBalance = d.initial_balance || 3000;
+    const totPnl = totBal - initialBalance;
     document.getElementById('total-bal').textContent = fmtMoney(totBal);
     const pnlEl = document.getElementById('total-pnl');
     pnlEl.textContent = (totPnl >= 0 ? '+' : '') + '$' + Math.abs(totPnl).toFixed(2);
@@ -342,7 +367,10 @@ async function fetchState() {
     document.getElementById('total-trades').textContent = totTrades;
     document.getElementById('win-rate').textContent = totTrades > 0 ? Math.round(totWins / totTrades * 100) + '%' : '—';
     document.getElementById('total-commission').textContent = fmtMoney(totCommission);
-
+    if (d.symbols) {
+    const symbolsText = d.symbols.map(s => s.replace('USDT', '')).join(', ');
+    document.getElementById('symbols-label').textContent = symbolsText;
+    }
     // Активные позиции
     const openBody = document.getElementById('open-positions-body');
     openBody.innerHTML = '';
@@ -365,7 +393,7 @@ async function fetchState() {
     if (openBody.children.length === 0) {
       openBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#4a5580;">Нет открытых позиций</td></tr>';
     }
-
+    
     // История сделок
     const tradesBody = document.getElementById('trades-body');
     tradesBody.innerHTML = '';
@@ -389,18 +417,31 @@ async function fetchState() {
     } else {
       tradesBody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#4a5580;">Сделок пока нет</td></tr>';
     }
-
-    // Логи
-    const symLogs = d.logs.filter(l => l.symbol === 'DOGEUSDT').slice(0, 40);
-    document.getElementById('log-DOGEUSDT').innerHTML = symLogs.map(l => {
+    
+    // Логи (общий лог)
+    const logDiv = document.getElementById('log-global');
+    logDiv.innerHTML = d.logs.map(l => {
       let color = '#607090';
       if (l.msg.includes('ПОКУПКА')) color = '#00d4a0';
       else if (l.msg.includes('ПРОДАЖА')) color = '#ff4d6d';
       else if (l.msg.includes('Трейлинг')) color = '#ffb930';
       else if (l.msg.includes('Стоп')) color = '#ff4d6d';
-      const msg = l.msg.replace('[DOGEUSDT] ', '');
-      return `<div style="color:${color}"><span class="lt">${l.time}</span>${msg}</div>`;
+      return `<div style="color:${color}"><span class="lt">${l.time}</span>${l.msg}</div>`;
     }).join('');
+    
+    // Создаём карточки для всех символов, которые ещё не созданы
+    if (d.symbols) {
+      const existingCards = document.querySelectorAll('.pcard');
+      const existingSymbols = Array.from(existingCards).map(card => card.id.replace('card-', ''));
+      for (let sym of d.symbols) {
+        if (!existingSymbols.includes(sym)) {
+          createPairCard(sym);
+        }
+      }
+    }
+    
+    // Обновляем все пары (карточки уже есть)
+    d.pairs.forEach(p => updatePairCard(p));
   } catch (e) { console.error(e); }
 }
 
@@ -410,18 +451,13 @@ async function reloadConfig() {
   if(confirm('Обновить конфигурацию? Бот продолжит работу.')) {
     const r = await fetch('/api/reload_config', {method:'POST'});
     const res = await r.json();
-    if (res.ok) {
-      alert('Конфигурация обновлена! Страница будет перезагружена.');
-      location.reload();
-    } else {
-      alert('Ошибка: ' + res.message);
-    }
+    if (res.ok) { alert('Конфигурация обновлена! Страница будет перезагружена.'); location.reload(); }
+    else alert('Ошибка: ' + res.message);
   }
 }
 function downloadCsv()     { window.location.href = '/api/download_csv'; }
-function downloadLog(sym)  { window.location.href = '/api/download_log?sym=' + sym; }
+function downloadLog()     { window.location.href = '/api/download_log'; }
 
-initCharts();
 fetchState();
 setInterval(fetchState, 5000);
 </script>

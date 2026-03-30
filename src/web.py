@@ -80,7 +80,9 @@ def api_state():
         "logs": list(global_logs)[:80],
         "trades": trades_for_ui,
         "interval": config.INTERVAL,
-        "version": config.VERSION,   # ← добавляем
+        "version": config.VERSION,
+        "symbols": config.SYMBOLS,
+        "initial_balance": config.INITIAL_BALANCE  
     })
 
 @app.route('/api/stop', methods=['POST'])

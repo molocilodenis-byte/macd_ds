@@ -52,9 +52,11 @@ def open_positions(symbol, s, signal_type, current_price, macd, signal_line, his
             trade_amount = s["virtual_balance"] * (config.TRADE_AMOUNT_VALUE / 100)
         else:
             trade_amount = config.TRADE_AMOUNT_VALUE
+
         if trade_amount < 10:
             log(f"🚫 Сумма сделки {trade_amount:.2f} USDT слишком мала (мин. 10 USDT)", symbol, log_prefix)
             break
+
         if s["virtual_balance"] >= trade_amount:
             buy_occurred = True
             commission_entry = round(trade_amount * config.COMMISSION_PCT, 6)
@@ -112,6 +114,7 @@ def analyze_pair(symbol):
     prev_price = closes[-2] if len(closes) > 1 else current_price
     current_volume = volumes[-1]
 
+    # --- РАСЧЁТ ИНДИКАТОРОВ (всегда) ---
     macd, signal_line, histogram, prev_histogram = calculate_macd(closes, config.MACD_FAST, config.MACD_SLOW, config.MACD_SIGNAL)
     rsi = calculate_rsi(closes, config.RSI_PERIOD)
 
@@ -136,6 +139,7 @@ def analyze_pair(symbol):
 
     roc = calculate_roc(closes, period=3)
 
+    # --- ОБНОВЛЕНИЕ СОСТОЯНИЯ (всегда, даже при низком объёме) ---
     s["price"] = current_price
     s["price_change"] = round((current_price - prev_price) / prev_price * 100, 2)
     s["macd"] = round(macd, 8)
@@ -161,6 +165,7 @@ def analyze_pair(symbol):
         False, False, len(s["positions"]), s["virtual_balance"]
     )
 
+    # --- ПРОВЕРКА ПРОГРЕВА и КУЛДАУНА (всегда) ---
     if s["_warmup"] > 0:
         s["_warmup"] -= 1
         log(f"👀 Прогрев {s['_warmup']} цикл(ов) осталось | RSI: {rsi:.1f} | Hist: {histogram:.6f} | Trend: {'✅' if trend_ok else '❌'} | Slope: {ema_slope_pct:+.2f}% | ROC: {roc:.2f}%", symbol, log_prefix)
@@ -171,6 +176,7 @@ def analyze_pair(symbol):
         log(f"⏳ Cooldown {s['_cooldown']} баров | RSI: {rsi:.1f} | Hist: {histogram:.6f}", symbol, log_prefix)
         return
 
+    # --- УПРАВЛЕНИЕ ТРЕЙЛИНГОМ И ПРОДАЖА (всегда) ---
     trail_dist = cfg["trailing_dist"]
     for pos in s["positions"]:
         if current_price > pos["max_price"]:
@@ -268,91 +274,99 @@ def analyze_pair(symbol):
         save_state()
         save_all_trades()
 
-    # ── ВХОД ─────────────────────────────────────────────────────────────
+    # --- СИГНАЛЫ ПОКУПКИ (только если объём OK) ---
+    # Инициализируем переменную, которая может использоваться позже (например, в log_market_data)
     buy_occurred = False
-
-    min_hist = current_price * cfg["min_hist_pct"]
-    signal_a = (histogram > 0 and prev_histogram <= 0 and histogram >= min_hist)
-    signal_b = (macd > signal_line and prev_histogram <= 0 and histogram > 0 and histogram >= min_hist)
-    signal_c = (histogram > 0 and prev_histogram > 0
-                and histogram > prev_histogram * cfg["momentum_mult"]
-                and macd > signal_line
-                and histogram >= min_hist)
-
-    signal_d = False
-    early_vol_ok = False
-    early_trend_ok = False
-    if cfg.get("enable_signal_d", True):
-        early_vol_min_pct = cfg.get("early_vol_min_pct", cfg["vol_min_pct"])
-        early_vol_ok = current_volume >= vol_sma * early_vol_min_pct if cfg["vol_filter"] else True
-        early_trend_mult = cfg.get("early_trend_mult", 1.001)
-        early_trend_ok = current_price > ema_trend * early_trend_mult
-        roc_ok = roc > cfg.get("roc_threshold", 0.3)
-        early_min_hist = current_price * cfg.get("early_min_hist_pct", 0.0002)
-        signal_d = (histogram > 0 and prev_histogram <= 0 and
-                    early_trend_ok and rsi_ok and early_vol_ok and roc_ok and
-                    histogram >= early_min_hist)
-
-    signal_type = None
-    if signal_a:
-        signal_type = "A"
-    elif signal_b:
-        signal_type = "B"
-    elif signal_c:
-        signal_type = "C"
-    elif signal_d:
-        signal_type = "D"
-
-    atr_ok = True
-    if config.USE_ATR_FILTER and len(s["atr_history"]) >= config.ATR_SMA_PERIOD:
-        atr_sma = sum(s["atr_history"]) / len(s["atr_history"])
-        if atr < atr_sma * config.ATR_MIN_RATIO:
-            atr_ok = False
-    elif config.USE_ATR_FILTER:
-        atr_ok = False
-
-    reasons = []
-    if signal_type is None:
-        reasons.append("сигнал MACD")
-
-    if signal_type in ('A','B','C'):
-        if not trend_ok:
-            reasons.append("тренд")
-        if not rsi_ok:
-            reasons.append("RSI")
-        if not vol_ok:
-            reasons.append("объём")
-        if not atr_ok:
-            reasons.append("низкая волатильность")
-    elif signal_type == 'D':
-        if not atr_ok:
-            reasons.append("низкая волатильность")
-
-    if signal_type and atr_ok:
-        if signal_type in ('A','B','C') and (trend_ok and rsi_ok and vol_ok):
-            opened, buy_occurred = open_positions(
-                symbol, s, signal_type, current_price, macd, signal_line, histogram, rsi, roc,
-                trail_dist, log_prefix, early=False
-            )
-            if opened > 0:
-                log_signal(symbol, signal_type, reasons, True, current_price, rsi, histogram,
-                           macd, signal_line, vol_ok, vol_sma, current_volume, trend_ok, rsi_ok, log_prefix)
-        elif signal_type == 'D':
-            opened, buy_occurred = open_positions(
-                symbol, s, signal_type, current_price, macd, signal_line, histogram, rsi, roc,
-                trail_dist, log_prefix, early=True
-            )
-            if opened > 0:
-                log_signal(symbol, signal_type, reasons, True, current_price, rsi, histogram,
-                           macd, signal_line, early_vol_ok, vol_sma, current_volume, early_trend_ok, rsi_ok, log_prefix)
-        else:
-            log_signal(symbol, signal_type, reasons, False, current_price, rsi, histogram,
-                       macd, signal_line, vol_ok, vol_sma, current_volume, trend_ok, rsi_ok, log_prefix)
+    # Если объём ниже порога, пропускаем всю логику покупок
+    vol_abs_min = cfg.get("vol_abs_min")
+    if vol_abs_min and current_volume < vol_abs_min:
+        # Покупать не будем, но завершим обновление состояния
+        pass
     else:
-        if signal_type:
-            log_signal(symbol, signal_type, reasons, False, current_price, rsi, histogram,
-                       macd, signal_line, vol_ok, vol_sma, current_volume, trend_ok, rsi_ok, log_prefix)
+        # Нормальная обработка сигналов
+        min_hist = current_price * cfg["min_hist_pct"]
+        signal_a = (histogram > 0 and prev_histogram <= 0 and histogram >= min_hist)
+        signal_b = (macd > signal_line and prev_histogram <= 0 and histogram > 0 and histogram >= min_hist)
+        signal_c = (histogram > 0 and prev_histogram > 0
+                    and histogram > prev_histogram * cfg["momentum_mult"]
+                    and macd > signal_line
+                    and histogram >= min_hist)
 
+        signal_d = False
+        early_vol_ok = False
+        early_trend_ok = False
+        if cfg.get("enable_signal_d", True):
+            early_vol_min_pct = cfg.get("early_vol_min_pct", cfg["vol_min_pct"])
+            early_vol_ok = current_volume >= vol_sma * early_vol_min_pct if cfg["vol_filter"] else True
+            early_trend_mult = cfg.get("early_trend_mult", 1.001)
+            early_trend_ok = current_price > ema_trend * early_trend_mult
+            roc_ok = roc > cfg.get("roc_threshold", 0.3)
+            early_min_hist = current_price * cfg.get("early_min_hist_pct", 0.0002)
+            signal_d = (histogram > 0 and prev_histogram <= 0 and
+                        early_trend_ok and rsi_ok and early_vol_ok and roc_ok and
+                        histogram >= early_min_hist)
+
+        signal_type = None
+        if signal_a:
+            signal_type = "A"
+        elif signal_b:
+            signal_type = "B"
+        elif signal_c:
+            signal_type = "C"
+        elif signal_d:
+            signal_type = "D"
+
+        atr_ok = True
+        if config.USE_ATR_FILTER and len(s["atr_history"]) >= config.ATR_SMA_PERIOD:
+            atr_sma = sum(s["atr_history"]) / len(s["atr_history"])
+            if atr < atr_sma * config.ATR_MIN_RATIO:
+                atr_ok = False
+        elif config.USE_ATR_FILTER:
+            atr_ok = False
+
+        reasons = []
+        if signal_type is None:
+            reasons.append("сигнал MACD")
+
+        if signal_type in ('A','B','C'):
+            if not trend_ok:
+                reasons.append("тренд")
+            if not rsi_ok:
+                reasons.append("RSI")
+            if not vol_ok:
+                reasons.append("объём")
+            if not atr_ok:
+                reasons.append("низкая волатильность")
+        elif signal_type == 'D':
+            if not atr_ok:
+                reasons.append("низкая волатильность")
+
+        if signal_type and atr_ok:
+            if signal_type in ('A','B','C') and (trend_ok and rsi_ok and vol_ok):
+                opened, buy_occurred = open_positions(
+                    symbol, s, signal_type, current_price, macd, signal_line, histogram, rsi, roc,
+                    trail_dist, log_prefix, early=False
+                )
+                if opened > 0:
+                    log_signal(symbol, signal_type, reasons, True, current_price, rsi, histogram,
+                              macd, signal_line, vol_ok, vol_sma, current_volume, trend_ok, rsi_ok, log_prefix)
+            elif signal_type == 'D':
+                opened, buy_occurred = open_positions(
+                    symbol, s, signal_type, current_price, macd, signal_line, histogram, rsi, roc,
+                    trail_dist, log_prefix, early=True
+                )
+                if opened > 0:
+                    log_signal(symbol, signal_type, reasons, True, current_price, rsi, histogram,
+                              macd, signal_line, early_vol_ok, vol_sma, current_volume, early_trend_ok, rsi_ok, log_prefix)
+            else:
+                log_signal(symbol, signal_type, reasons, False, current_price, rsi, histogram,
+                          macd, signal_line, vol_ok, vol_sma, current_volume, trend_ok, rsi_ok, log_prefix)
+        else:
+            if signal_type:
+                log_signal(symbol, signal_type, reasons, False, current_price, rsi, histogram,
+                          macd, signal_line, vol_ok, vol_sma, current_volume, trend_ok, rsi_ok, log_prefix)
+
+    # --- ФИНАЛЬНОЕ ОБНОВЛЕНИЕ ПОЛЕЙ СТАТУСА ---
     if s["positions"]:
         s["entry_price"] = s["positions"][0]["entry_price"]
         s["pnl"] = s["positions"][0].get("pnl_pct", 0.0)
@@ -362,6 +376,7 @@ def analyze_pair(symbol):
     s["in_position"] = len(s["positions"]) > 0
     s["signal"] = "BUY" if len(s["positions"]) > 0 else "HOLD"
 
+    # --- ЛОГИРОВАНИЕ МАРКЕТ ДАТЫ ПРИ СДЕЛКАХ ---
     if buy_occurred or sell_occurred:
         log_market_data(
             symbol, int(time.time()), current_price, current_volume,
