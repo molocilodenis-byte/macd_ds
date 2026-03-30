@@ -2,13 +2,11 @@ import os
 import json
 from collections import deque
 from datetime import datetime
-import config
 from config import ALL_TRADES_FILE, STATE_FILE, INITIAL_BALANCE, SYMBOLS, ATR_SMA_PERIOD
 from utils import log
 import trading
 
 def load_all_trades():
-    global trade_counter, global_trades
     if not os.path.isfile(ALL_TRADES_FILE):
         return
     try:
@@ -33,6 +31,7 @@ def load_all_trades():
                 "reason": t["buy_reason"],
                 "bal": t["balance_after"],
                 "trade_amount": t["trade_amount"],
+                "qty": t.get("qty", t["trade_amount"] / t["entry_price"]),
             })
         open_trades = [t for t in all_trades.get("trades", []) if t["status"] == "open"]
         for sym in SYMBOLS:
@@ -41,6 +40,8 @@ def load_all_trades():
             s["positions"] = []
             for ot in open_trades:
                 if ot["symbol"] == sym:
+                    # Восстанавливаем qty, если его нет (старые файлы)
+                    qty = ot.get("qty", ot["trade_amount"] / ot["entry_price"])
                     s["positions"].append({
                         "entry_price": ot["entry_price"],
                         "entry_time": ot["entry_time"],
@@ -52,6 +53,7 @@ def load_all_trades():
                         "entry_histogram": ot["entry_histogram"],
                         "entry_rsi": ot["entry_rsi"],
                         "trade_amount": ot["trade_amount"],
+                        "qty": qty,
                         "commission_entry": ot["commission_entry"],
                     })
             if closed_trades:
@@ -87,6 +89,7 @@ def save_all_trades():
             "exit_time": t["xd"],
             "exit_price": t["xp"],
             "trade_amount": t["trade_amount"],
+            "qty": t.get("qty", t["trade_amount"] / t["ep"]),
             "pnl_gross": t["pnl_gross"],
             "pnl_net": t["pnl"],
             "pnl_pct": t["pnl_pct"],
@@ -104,6 +107,7 @@ def save_all_trades():
                 "entry_time": pos["entry_time"],
                 "entry_price": pos["entry_price"],
                 "trade_amount": pos["trade_amount"],
+                "qty": pos["qty"],
                 "max_price": pos["max_price"],
                 "trailing_stop": pos["trailing_stop"],
                 "buy_reason": pos["buy_reason"],
@@ -122,11 +126,12 @@ def save_all_trades():
 
 def save_state():
     state = {
-        "version": config.VERSION,
+        "version": "v7.2",
         "timestamp": datetime.now().isoformat(),
         "pairs": {},
     }
     for sym, s in trading.pairs_state.items():
+        # Сохраняем только персистентные данные (не prev_macd, hist_negative_count)
         state["pairs"][sym] = {
             "symbol": s["symbol"],
             "positions": s["positions"],
@@ -180,4 +185,8 @@ def load_state():
             s["hist_history"] = deque(saved["hist_history"], maxlen=60)
         if "rsi_history" in saved:
             s["rsi_history"] = deque(saved["rsi_history"], maxlen=60)
+        # Для старых сохранений, где не было qty, добавляем её в позиции
+        for pos in s["positions"]:
+            if "qty" not in pos:
+                pos["qty"] = pos["trade_amount"] / pos["entry_price"]
     log(f"Состояние загружено из {STATE_FILE}")
